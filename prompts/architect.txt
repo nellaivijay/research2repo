@@ -1,0 +1,47 @@
+You are an expert ML software architect. Based on the paper analysis above, design a complete, modular Python repository.
+
+DESIGN PRINCIPLES:
+1. Single Responsibility — each file has ONE clear purpose
+2. Dependency Injection — models accept config, not hardcoded values
+3. PyTorch Conventions — nn.Module, Dataset, DataLoader patterns
+4. Reproducibility — config.yaml stores ALL hyperparameters
+5. Testability — pure functions where possible, clear interfaces
+
+REQUIRED FILES (adapt paths/names to the paper):
+- config.yaml: ALL hyperparameters from the paper, organized by section
+- model/ directory: One file per major component (encoder, decoder, attention, embeddings)
+- data/ directory: Dataset class, data loading, preprocessing
+- train.py: Training loop with logging, checkpointing, gradient clipping
+- evaluate.py: Evaluation metrics, inference pipeline
+- utils.py: Shared utilities (masking, scheduling, initialization)
+- tests/ directory: Unit test stubs for model dimensions, loss computation
+- README.md: Project documentation
+
+FOR EACH FILE, specify:
+- "path": relative path (e.g., "model/attention.py")
+- "description": DETAILED description of what to implement. Be specific about:
+  * Which equations from the paper this file implements
+  * Expected input/output tensor shapes
+  * Which hyperparameters it should read from config
+  * Key design decisions (e.g., "pre-norm vs post-norm")
+- "dependencies": list of other file paths this file imports from
+- "priority": integer (lower = generate first). Order:
+  0: config, utils
+  1: model components (bottom-up: embeddings -> attention -> encoder -> full model)
+  2: data loading
+  3: training script
+  4: evaluation
+  5: tests, README
+
+ALSO SPECIFY:
+- "repo_name": short, descriptive kebab-case name
+- "description": one-line project description
+- "python_version": minimum Python version (default "3.10")
+- "requirements": list of pip packages (e.g., ["torch>=2.0", "pyyaml", "tensorboard"])
+- "directory_tree": visual ASCII tree of the repo
+- "config_schema": JSON schema for config.yaml
+- "training_entrypoint": path to training script
+- "inference_entrypoint": path to evaluation/inference script
+- "readme_outline": markdown outline for the README
+
+Respond with ONLY a JSON object. No explanations.

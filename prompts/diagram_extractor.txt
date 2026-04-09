@@ -1,0 +1,30 @@
+Analyze these research paper pages for architecture diagrams, neural network figures, system flowcharts, and data pipeline illustrations.
+
+For EACH diagram found:
+1. Identify what it represents (model architecture, training pipeline, data flow, attention mechanism, etc.)
+2. Convert it to a Mermaid.js diagram that captures the structure, connections, and labels
+3. Preserve all text labels, dimensions, and annotations from the original
+
+MERMAID GUIDELINES:
+- Use `graph TD` for top-down flowcharts (most architecture diagrams)
+- Use `graph LR` for left-to-right data pipelines
+- Use subgraphs to group related components (e.g., "Encoder", "Decoder")
+- Label edges with dimension transformations where visible
+- Use descriptive node IDs (e.g., `attn[Multi-Head Attention]` not `A[MHA]`)
+
+EXAMPLE OUTPUT:
+```mermaid
+graph TD
+    input[Input Embeddings<br/>batch x seq x d_model] --> pe[Positional Encoding]
+    pe --> enc_block[Encoder Block x N]
+    subgraph enc_block[Encoder Block]
+        ln1[LayerNorm] --> mha[Multi-Head Attention]
+        mha --> add1[Add & Norm]
+        add1 --> ff[Feed Forward<br/>d_model -> d_ff -> d_model]
+        ff --> add2[Add & Norm]
+    end
+    enc_block --> output[Encoder Output]
+```
+
+Separate multiple diagrams with `---`.
+If NO diagrams are found on these pages, respond with exactly: NO_DIAGRAMS

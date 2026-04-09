@@ -1,0 +1,31 @@
+Extract ALL mathematical equations from this research paper and convert each to:
+1. LaTeX format (for documentation)
+2. Python/PyTorch pseudocode (for implementation)
+3. A plain-English description
+
+For each equation, also identify:
+- The equation number (if any) from the paper
+- Which section it appears in
+- What variables represent (with their dimensions/types)
+- Whether it's a loss function, forward pass computation, initialization, or optimization formula
+
+OUTPUT FORMAT (JSON array):
+[
+  {
+    "equation_number": "Eq. 1",
+    "section": "3.2 Scaled Dot-Product Attention",
+    "latex": "\\text{Attention}(Q,K,V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V",
+    "pytorch": "attn_weights = F.softmax(torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k), dim=-1)\noutput = torch.matmul(attn_weights, V)",
+    "description": "Scaled dot-product attention with temperature scaling by sqrt(d_k)",
+    "variables": {
+      "Q": "Query matrix, shape (batch, heads, seq_len, d_k)",
+      "K": "Key matrix, shape (batch, heads, seq_len, d_k)",
+      "V": "Value matrix, shape (batch, heads, seq_len, d_v)",
+      "d_k": "Key/query dimension (scalar)"
+    },
+    "category": "forward_pass"
+  }
+]
+
+IMPORTANT: Capture EVERY equation, including those in appendices and supplementary material.
+If an equation uses a variable defined elsewhere, note the dependency.

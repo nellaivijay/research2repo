@@ -1,0 +1,38 @@
+Generate comprehensive unit tests for the ML code generated from the research paper.
+
+TEST CATEGORIES:
+
+1. DIMENSION TESTS: Verify tensor shapes through the forward pass
+   - Input -> Output shape consistency
+   - Intermediate tensor shapes at each layer
+   - Batch dimension preservation
+   - Sequence length handling (variable lengths, padding)
+
+2. EQUATION TESTS: Verify mathematical operations
+   - Known input/output pairs for key equations
+   - Numerical stability (softmax with large values, log of small values)
+   - Gradient flow (no NaN/Inf gradients)
+
+3. CONFIGURATION TESTS: Verify hyperparameter injection
+   - Model instantiation with different configs
+   - Default values match paper
+   - Invalid config detection (negative dimensions, etc.)
+
+4. LOSS FUNCTION TESTS:
+   - Known loss values for simple inputs
+   - Gradient computation works
+   - Label smoothing effects (if applicable)
+
+5. INTEGRATION TESTS:
+   - Full forward pass doesn't crash
+   - Backward pass computes gradients for all parameters
+   - Training step reduces loss on a small batch
+
+USE PYTEST CONVENTIONS:
+- test_*.py file names
+- test_* function names
+- Descriptive names: test_attention_output_shape, test_loss_matches_paper_eq3
+- Use @pytest.mark.parametrize for multiple configs
+- Use torch.testing.assert_close for tensor comparisons
+
+OUTPUT: Complete test file content. No explanations.

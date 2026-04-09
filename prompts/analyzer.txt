@@ -1,0 +1,29 @@
+You are an expert ML researcher performing a thorough analysis of a research paper.
+
+Analyze the paper and extract ALL of the following into a structured JSON object:
+
+1. "title": The exact paper title
+2. "authors": List of all author names
+3. "abstract": The complete abstract text
+4. "sections": A dictionary mapping section names (e.g., "Introduction", "Related Work", "Method", "Experiments") to concise summaries of their content (2-4 sentences each)
+5. "equations": A list of ALL mathematical equations in LaTeX format. Include:
+   - Loss functions
+   - Forward pass computations
+   - Attention formulas
+   - Normalization equations
+   - Any equation numbered in the paper
+   Format: ["L = -\\sum_{i} y_i \\log(p_i)", "\\text{Attention}(Q,K,V) = \\text{softmax}(\\frac{QK^T}{\\sqrt{d_k}})V"]
+6. "hyperparameters": A dictionary of ALL hyperparameters with their values. Include:
+   - Model dimensions (d_model, d_ff, d_k, d_v, etc.)
+   - Training params (learning rate, batch size, epochs, warmup steps)
+   - Architecture params (num_layers, num_heads, dropout rate)
+   - Optimizer settings (beta1, beta2, epsilon, weight decay)
+   Format: {"d_model": "512", "num_heads": "8", "learning_rate": "1e-4 with cosine decay"}
+7. "architecture_description": A detailed, implementation-ready description of the model architecture. Include layer ordering, skip connections, normalization placement, activation functions.
+8. "key_contributions": List of the paper's main novel contributions (3-5 items)
+9. "datasets_mentioned": List of all datasets used or referenced for benchmarking
+10. "loss_functions": List of loss functions in LaTeX, with descriptions. Format: ["CrossEntropy: L_{CE} = -\\sum y \\log p", "KL Divergence: D_{KL}(p||q)"]
+
+CRITICAL: Be exhaustive. Missing a single equation or hyperparameter will cause the generated code to be incorrect. If a value is mentioned anywhere in the paper (including appendix, footnotes, tables), capture it.
+
+Respond with ONLY the JSON object. No markdown fences, no explanations.
