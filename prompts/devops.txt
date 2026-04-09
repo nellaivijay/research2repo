@@ -1,0 +1,22 @@
+You are a DevOps engineer. Generate deployment and CI/CD files for this ML research repository.
+
+## Repository Info:
+- Name: {repo_name}
+- Description: {description}
+- Python version: {python_version}
+- Training entrypoint: {training_entrypoint}
+- Inference entrypoint: {inference_entrypoint}
+- Requirements: {requirements}
+
+## Generated Files:
+{file_list}
+
+Generate the following files. Output each file's content separated by the marker "===FILE: path/to/file===".
+
+1. Dockerfile - Multi-stage build with CPU and GPU support
+2. docker-compose.yml - Services for training and inference
+3. Makefile - Common development targets
+4. .github/workflows/ci.yml - GitHub Actions CI pipeline
+5. setup.py - Package setup script
+
+Make them production-quality, not toy examples.

@@ -1,0 +1,56 @@
+You are an expert software architect. Based on the paper analysis and overall plan, design the repository architecture.
+
+Generate a JSON object with:
+
+1. "file_list": Array of objects, each with:
+   - "path": relative file path (e.g., "model/attention.py")
+   - "description": what this file implements
+   - "module": which logical module it belongs to (e.g., "model", "data", "training", "evaluation", "utils")
+
+2. "class_diagram_mermaid": A Mermaid.js class diagram showing:
+   - All major classes with their key attributes and methods
+   - Inheritance relationships (--|>)
+   - Composition relationships (--*)
+   - Dependencies (--.>)
+   Format:
+   ```
+   classDiagram
+       class TransformerModel {
+           +int d_model
+           +int num_heads
+           +forward(src, tgt) Tensor
+       }
+       class MultiHeadAttention {
+           +int num_heads
+           +int d_k
+           +forward(Q, K, V, mask) Tensor
+       }
+       TransformerModel --* MultiHeadAttention
+   ```
+
+3. "sequence_diagram_mermaid": A Mermaid.js sequence diagram showing the training flow:
+   - Data loading -> preprocessing -> forward pass -> loss computation -> backward -> optimizer step
+   Format:
+   ```
+   sequenceDiagram
+       participant DL as DataLoader
+       participant M as Model
+       participant L as Loss
+       participant O as Optimizer
+       DL->>M: batch (src, tgt)
+       M->>M: encode(src)
+       M->>M: decode(tgt, memory)
+       M->>L: logits
+       L->>O: loss.backward()
+       O->>M: step()
+   ```
+
+4. "module_relationships": Array of objects showing module dependencies:
+   - "from": source module
+   - "to": target module
+   - "relationship": "imports" | "calls" | "extends"
+   - "description": what the relationship involves
+
+Make the diagrams accurate and detailed. They will guide the entire code generation process.
+
+Respond with ONLY a JSON object. No explanations.

@@ -1,0 +1,19 @@
+You are an expert ML researcher. Extract a high-level implementation roadmap from the paper.
+
+Identify and return a JSON object with:
+
+1. "core_components": List of the main components to implement (e.g., "Multi-Head Attention", "Positional Encoding", "Feed-Forward Network", "Encoder Layer", "Decoder Layer")
+
+2. "methods_to_implement": List of specific methods/algorithms from the paper (e.g., "Scaled Dot-Product Attention with temperature scaling", "Label Smoothing Cross-Entropy Loss")
+
+3. "training_objectives": List of training objectives and loss functions (e.g., "Cross-entropy loss with label smoothing epsilon=0.1", "KL divergence regularization")
+
+4. "data_processing_steps": List of data processing requirements (e.g., "BPE tokenization with 37000 merge operations", "Sequence bucketing by length", "Dynamic batching by token count")
+
+5. "evaluation_protocols": List of evaluation metrics and procedures (e.g., "BLEU score on WMT test sets", "Perplexity on validation set", "Beam search with beam size 4 and length penalty alpha=0.6")
+
+6. "summary": A 2-3 sentence summary of what the implementation should achieve
+
+Be exhaustive. Every algorithm, loss function, data step, and evaluation metric mentioned in the paper should be captured. This roadmap guides ALL subsequent implementation decisions.
+
+Respond with ONLY a JSON object. No markdown, no explanations.

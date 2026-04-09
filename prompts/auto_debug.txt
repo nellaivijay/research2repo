@@ -1,0 +1,40 @@
+You are an expert Python debugger. Analyze the error and fix the code.
+
+## Error Message:
+{error_message}
+
+## Error Type: {error_type}
+
+## Relevant Source Files:
+{source_files}
+
+## Task:
+1. Identify the ROOT CAUSE of the error (not just the symptom)
+2. Determine which file(s) need to be modified
+3. Generate the MINIMAL fix that resolves the error
+
+Common error patterns and fixes:
+- ImportError/ModuleNotFoundError: Fix import paths, add missing __init__.py, install missing packages
+- TypeError: Fix argument types, check function signatures
+- ValueError: Fix data shapes, check tensor dimensions
+- RuntimeError: Fix CUDA issues, memory issues, tensor device mismatches
+- FileNotFoundError: Fix file paths, create missing config files
+- SyntaxError: Fix Python syntax
+- AttributeError: Fix class attribute access, check API changes
+
+RESPONSE FORMAT (JSON):
+{
+  "root_cause": "Description of what went wrong",
+  "fixes": [
+    {
+      "file_path": "path/to/file.py",
+      "description": "What this fix does",
+      "original_snippet": "The exact code that needs to change (for context)",
+      "fixed_snippet": "The corrected code"
+    }
+  ],
+  "additional_files_needed": ["list of any new files that need to be created"],
+  "packages_needed": ["list of any missing pip packages"]
+}
+
+Be conservative — make the MINIMAL change needed. Do not refactor or improve code beyond fixing the error.

@@ -1,0 +1,36 @@
+You are an expert software engineer. Based on the architecture design and overall plan, define the execution logic.
+
+The goal is to determine:
+1. Which files depend on which other files
+2. What order files should be generated (and later executed) in
+3. Detailed logic specifications for each file
+
+Generate a JSON object with:
+
+1. "execution_order": Ordered list of file paths, from first to generate to last. Rules:
+   - Config and utility files FIRST
+   - Base classes before derived classes
+   - Data loading before training
+   - Model components bottom-up (embeddings -> attention -> encoder -> full model)
+   - Training script after all model and data files
+   - Evaluation after training
+   - Tests last
+
+2. "dependency_graph": Object mapping each file path to a list of file paths it depends on.
+   Example: {"model/encoder.py": ["model/attention.py", "model/feedforward.py", "utils.py"]}
+   A file MUST NOT be generated before its dependencies.
+
+3. "file_specifications": Array of objects, one per file, with:
+   - "path": file path
+   - "logic_description": Detailed description of the implementation logic (3-5 sentences)
+   - "key_functions": Array of objects with:
+     - "name": function/method name
+     - "signature": full Python signature with type hints
+     - "description": what it does
+     - "equations": list of paper equation references this implements
+     - "complexity": "simple" | "medium" | "complex"
+
+Ensure the execution order is consistent with the dependency graph (topological sort).
+Every file from the architecture design must appear exactly once in the execution order.
+
+Respond with ONLY a JSON object.

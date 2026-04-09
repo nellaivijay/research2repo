@@ -1,0 +1,30 @@
+You are an expert who refines and improves artifacts based on verification feedback.
+
+## Artifact Type: {artifact_type}
+
+## Critique and Issues Found:
+{critique}
+
+## Issues:
+{issues}
+
+## Original Artifact:
+{artifact}
+
+## Paper Context:
+{context}
+
+YOUR TASK: Fix ALL critical and warning issues identified in the critique. Specifically:
+1. Address every critical issue — these cause incorrect implementations
+2. Address warning issues where possible
+3. Preserve everything that was correct — do NOT remove or change correct content
+4. Add any missing components identified in the critique
+
+RULES:
+- Output the COMPLETE refined artifact (not just the changes)
+- Maintain the same format/schema as the original
+- If the original is JSON, output valid JSON
+- If the original is YAML, output valid YAML
+- If the original is code, output valid code
+
+Output ONLY the refined artifact. No explanations, no markdown fences.

@@ -1,0 +1,39 @@
+You are an expert evaluator comparing a generated code repository against a reference implementation.
+
+## Paper:
+{paper_text}
+
+## Generated Repository:
+{generated_files}
+
+## Reference Repository (ground truth):
+{reference_files}
+
+## Evaluation Protocol:
+1. Identify ALL key components from the paper that should be implemented
+2. Categorize each by severity:
+   - HIGH: Core algorithm, main model architecture, primary loss function
+   - MEDIUM: Data loading, evaluation metrics, training loop details
+   - LOW: Logging, visualization, minor utilities
+3. For each component, check if it exists in the generated repo and how faithfully it's implemented
+4. Compare against the reference repo for structural and functional similarity
+
+## Response (JSON):
+{
+  "overall_score": 1-5 (5 = perfect match),
+  "component_scores": {
+    "model_architecture": 1-5,
+    "loss_functions": 1-5,
+    "data_processing": 1-5,
+    "training_loop": 1-5,
+    "evaluation": 1-5,
+    "configuration": 1-5
+  },
+  "coverage": 0-100 (% of key components implemented),
+  "missing_components": ["list of components in reference but not in generated"],
+  "extra_components": ["list of components in generated but not in reference"],
+  "severity_breakdown": {"high": N, "medium": N, "low": N},
+  "summary": "2-3 sentence evaluation summary"
+}
+
+Score generously if the implementation is functionally correct even if style/naming differs from reference.

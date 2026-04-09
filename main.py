@@ -1,26 +1,20 @@
 """
-Research2Repo: Multi-Model Agentic Pipeline
-============================================
+Research2Repo v3.0: Multi-Model Agentic Pipeline
+=================================================
 Converts ML research papers into production-ready GitHub repositories.
 
 Supports: Google Gemini, OpenAI GPT-4o/o3, Anthropic Claude, Ollama (local).
 
-Pipeline Stages:
-  1. Download & Ingest PDF
-  2. Analyze (long-context + vision extraction)
-  3. Extract Equations (dedicated equation pipeline)
-  4. Architect (repository structure design)
-  5. Generate Config (structured YAML from hyperparameters)
-  6. Synthesize Code (file-by-file with rolling context)
-  7. Generate Tests (pytest suite)
-  8. Validate (self-review against paper)
-  9. Auto-Fix (repair critical issues)
-  10. Save Repository
+Modes:
+  classic  — Original 10-stage linear pipeline (v2.0 compatible)
+  agent    — Enhanced multi-agent pipeline with decomposed planning,
+             per-file analysis, self-refine loops, execution sandbox,
+             DevOps generation, and reference-based evaluation
 
 Usage:
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --output_dir ./generated_repo
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider openai --model gpt-4o
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider ollama --model deepseek-coder-v2:latest
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --refine --execute
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --interactive
 """
 
 import argparse
@@ -34,15 +28,9 @@ import requests
 
 from providers import ProviderRegistry, get_provider
 from providers.base import ModelCapability, GenerationConfig
-from core.analyzer import PaperAnalyzer
-from core.architect import SystemArchitect
-from core.coder import CodeSynthesizer
-from core.validator import CodeValidator
-from advanced.equation_extractor import EquationExtractor
-from advanced.config_generator import ConfigGenerator
-from advanced.test_generator import TestGenerator
-from advanced.cache import PipelineCache
 
+
+# ── PDF Download ──────────────────────────────────────────────────────────
 
 def download_pdf(url: str, save_path: str, timeout: int = 120, max_size_mb: int = 100) -> str:
     """
@@ -57,10 +45,10 @@ def download_pdf(url: str, save_path: str, timeout: int = 120, max_size_mb: int 
     Returns:
         Path to the saved PDF.
     """
-    print(f"[1/10] Downloading PDF from {url}...")
+    print(f"  Downloading PDF from {url}...")
 
     headers = {
-        "User-Agent": "Research2Repo/2.0 (Academic Tool; +https://github.com/nellaivijay/Research2Repo)"
+        "User-Agent": "Research2Repo/3.0 (Academic Tool; +https://github.com/nellaivijay/Research2Repo)"
     }
     response = requests.get(url, stream=True, timeout=timeout, headers=headers)
     response.raise_for_status()
@@ -85,17 +73,21 @@ def download_pdf(url: str, save_path: str, timeout: int = 120, max_size_mb: int 
     return save_path
 
 
-def print_provider_info(provider_name: str, model_name: str) -> None:
+# ── Banner ────────────────────────────────────────────────────────────────
+
+def print_banner(provider_name: str, model_name: str, mode: str) -> None:
     """Print provider and model information."""
     print(f"\n{'='*60}")
-    print(f"  Research2Repo v2.0 — Multi-Model Pipeline")
+    print(f"  Research2Repo v3.0 — {'Agent' if mode == 'agent' else 'Classic'} Pipeline")
     print(f"  Provider: {provider_name}")
     print(f"  Model: {model_name}")
     print(f"  Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
 
 
-def main(
+# ── Classic Pipeline (v2.0 compatible) ────────────────────────────────────
+
+def run_classic(
     pdf_url: str,
     output_dir: str,
     provider_name: Optional[str] = None,
@@ -111,23 +103,18 @@ def main(
     verbose: bool = False,
 ) -> None:
     """
-    Run the full Research2Repo pipeline.
+    Run the classic 10-stage Research2Repo pipeline.
 
-    Args:
-        pdf_url: URL of the research paper PDF.
-        output_dir: Directory to generate the repository in.
-        provider_name: LLM provider ('gemini', 'openai', 'anthropic', 'ollama').
-        model_name: Specific model to use (provider-dependent).
-        vision_provider_name: Provider for diagram extraction (defaults to primary).
-        vision_model_name: Model for vision tasks.
-        skip_validation: Skip the validation pass.
-        skip_tests: Skip test generation.
-        skip_equations: Skip dedicated equation extraction.
-        max_fix_iterations: Max auto-fix attempts for critical issues.
-        use_cache: Enable pipeline caching.
-        cache_dir: Custom cache directory.
-        verbose: Verbose output.
+    This is the original v2.0 pipeline, kept for backward compatibility.
     """
+    from core.analyzer import PaperAnalyzer
+    from core.architect import SystemArchitect
+    from core.coder import CodeSynthesizer
+    from core.validator import CodeValidator
+    from advanced.equation_extractor import EquationExtractor
+    from advanced.config_generator import ConfigGenerator
+    from advanced.test_generator import TestGenerator
+    from advanced.cache import PipelineCache
 
     start_time = time.time()
     os.makedirs(output_dir, exist_ok=True)
@@ -140,7 +127,7 @@ def main(
     )
     actual_provider = provider_name or primary_provider.__class__.__name__.replace("Provider", "").lower()
     actual_model = primary_provider.model_name
-    print_provider_info(actual_provider, actual_model)
+    print_banner(actual_provider, actual_model, "classic")
 
     # Vision provider (may differ from primary)
     vision_provider = None
@@ -159,6 +146,7 @@ def main(
         # ============================================================
         # STAGE 1: Download PDF
         # ============================================================
+        print(f"[1/10] Download PDF")
         download_pdf(pdf_url, temp_pdf_path)
 
         # Check cache
@@ -376,6 +364,82 @@ def main(
             os.remove(temp_pdf_path)
 
 
+# ── Agent Pipeline (v3.0) ────────────────────────────────────────────────
+
+def run_agent(
+    pdf_url: str,
+    output_dir: str,
+    provider_name: Optional[str] = None,
+    model_name: Optional[str] = None,
+    enable_refine: bool = False,
+    enable_execution: bool = False,
+    enable_tests: bool = True,
+    enable_evaluation: bool = False,
+    enable_devops: bool = True,
+    interactive: bool = False,
+    max_fix_iterations: int = 2,
+    max_refine_iterations: int = 2,
+    max_debug_iterations: int = 3,
+    reference_dir: Optional[str] = None,
+    verbose: bool = False,
+) -> None:
+    """
+    Run the enhanced v3.0 agent pipeline.
+
+    Features beyond classic mode:
+      - 4-stage decomposed planning (overall -> architecture -> logic -> config)
+      - Per-file analysis with accumulated context
+      - Self-refine verify/refine loops at each stage
+      - Execution sandbox with auto-debugging
+      - DevOps generation (Dockerfile, Makefile, CI)
+      - Reference-based evaluation scoring
+      - Interactive planning review mode
+    """
+    from agents.orchestrator import AgentOrchestrator
+
+    # Initialize provider
+    primary_provider = get_provider(
+        provider_name=provider_name,
+        model_name=model_name,
+    )
+    actual_provider = provider_name or primary_provider.__class__.__name__.replace("Provider", "").lower()
+    actual_model = primary_provider.model_name
+    print_banner(actual_provider, actual_model, "agent")
+
+    os.makedirs(output_dir, exist_ok=True)
+    temp_pdf_path = os.path.join(output_dir, "source_paper.pdf")
+
+    # Download PDF
+    print(f"[Download] Fetching paper...")
+    download_pdf(pdf_url, temp_pdf_path)
+
+    # Build orchestrator config
+    config = {
+        "enable_refine": enable_refine,
+        "enable_execution": enable_execution,
+        "enable_tests": enable_tests,
+        "enable_evaluation": enable_evaluation,
+        "enable_devops": enable_devops,
+        "interactive": interactive,
+        "max_fix_iterations": max_fix_iterations,
+        "max_refine_iterations": max_refine_iterations,
+        "max_debug_iterations": max_debug_iterations,
+        "reference_dir": reference_dir,
+        "verbose": verbose,
+    }
+
+    # Run the full agent pipeline
+    orchestrator = AgentOrchestrator(provider=primary_provider, config=config)
+    result = orchestrator.run(
+        pdf_path=temp_pdf_path,
+        output_dir=output_dir,
+    )
+
+    return result
+
+
+# ── Provider Listing ──────────────────────────────────────────────────────
+
 def list_providers_cmd() -> None:
     """List available providers and models."""
     print("\nAvailable Providers:")
@@ -415,26 +479,32 @@ def list_providers_cmd() -> None:
     print()
 
 
+# ── CLI Entry Point ───────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Research2Repo: Convert ML papers to GitHub repositories.",
+        description="Research2Repo v3.0: Convert ML papers to GitHub repositories.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Auto-detect provider (uses first available)
+  # Classic mode (v2.0 compatible)
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
+
+  # Agent mode with decomposed planning + self-refine
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --refine
+
+  # Agent mode with execution sandbox + auto-debug
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --execute
+
+  # Interactive planning review (agent mode)
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --interactive
+
+  # Full agent pipeline with all features
+  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent \\
+    --refine --execute --evaluate --reference-dir ./reference_impl
 
   # Use specific provider and model
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider openai --model gpt-4o
-
-  # Use Gemini for analysis, Claude for coding
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider gemini --vision-provider anthropic
-
-  # Use local Ollama model
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider ollama --model deepseek-coder-v2:latest
-
-  # Fast run (skip validation and tests)
-  python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --skip-validation --skip-tests
 
   # List available providers
   python main.py --list-providers
@@ -445,6 +515,9 @@ Examples:
     parser.add_argument("--pdf_url", type=str, help="URL of the research paper PDF.")
     parser.add_argument("--output_dir", type=str, default="./generated_repo",
                         help="Target directory for generated repo (default: ./generated_repo)")
+    parser.add_argument("--mode", type=str, default="classic",
+                        choices=["classic", "agent"],
+                        help="Pipeline mode: 'classic' (v2.0) or 'agent' (v3.0, default: classic)")
 
     # Provider selection
     provider_group = parser.add_argument_group("Model Provider")
@@ -459,16 +532,37 @@ Examples:
     provider_group.add_argument("--vision-model", type=str, default=None,
                                 help="Model for vision tasks")
 
-    # Pipeline control
-    pipeline_group = parser.add_argument_group("Pipeline Options")
-    pipeline_group.add_argument("--skip-validation", action="store_true",
-                                help="Skip the validation pass")
-    pipeline_group.add_argument("--skip-tests", action="store_true",
-                                help="Skip test generation")
-    pipeline_group.add_argument("--skip-equations", action="store_true",
-                                help="Skip dedicated equation extraction")
-    pipeline_group.add_argument("--max-fix-iterations", type=int, default=2,
-                                help="Max auto-fix attempts (default: 2)")
+    # Classic pipeline control
+    classic_group = parser.add_argument_group("Classic Pipeline Options")
+    classic_group.add_argument("--skip-validation", action="store_true",
+                               help="Skip the validation pass (classic mode)")
+    classic_group.add_argument("--skip-tests", action="store_true",
+                               help="Skip test generation (classic mode)")
+    classic_group.add_argument("--skip-equations", action="store_true",
+                               help="Skip dedicated equation extraction (classic mode)")
+    classic_group.add_argument("--max-fix-iterations", type=int, default=2,
+                               help="Max auto-fix attempts (default: 2)")
+
+    # Agent pipeline control
+    agent_group = parser.add_argument_group("Agent Pipeline Options (--mode agent)")
+    agent_group.add_argument("--refine", action="store_true",
+                             help="Enable self-refine loops at each stage")
+    agent_group.add_argument("--execute", action="store_true",
+                             help="Enable execution sandbox + auto-debug")
+    agent_group.add_argument("--evaluate", action="store_true",
+                             help="Enable reference-based evaluation scoring")
+    agent_group.add_argument("--no-tests", action="store_true",
+                             help="Disable test generation (agent mode)")
+    agent_group.add_argument("--no-devops", action="store_true",
+                             help="Disable DevOps file generation")
+    agent_group.add_argument("--interactive", action="store_true",
+                             help="Pause after planning for user review")
+    agent_group.add_argument("--reference-dir", type=str, default=None,
+                             help="Reference implementation directory for evaluation")
+    agent_group.add_argument("--max-refine-iterations", type=int, default=2,
+                             help="Max self-refine iterations per stage (default: 2)")
+    agent_group.add_argument("--max-debug-iterations", type=int, default=3,
+                             help="Max auto-debug iterations (default: 3)")
 
     # Cache control
     cache_group = parser.add_argument_group("Cache")
@@ -493,6 +587,7 @@ Examples:
         sys.exit(0)
 
     if args.clear_cache:
+        from advanced.cache import PipelineCache
         cache = PipelineCache(args.cache_dir)
         cache.clear()
         print("Cache cleared.")
@@ -502,19 +597,38 @@ Examples:
     if not args.pdf_url:
         parser.error("--pdf_url is required (or use --list-providers / --clear-cache)")
 
-    # Run pipeline
-    main(
-        pdf_url=args.pdf_url,
-        output_dir=args.output_dir,
-        provider_name=args.provider,
-        model_name=args.model,
-        vision_provider_name=args.vision_provider,
-        vision_model_name=args.vision_model,
-        skip_validation=args.skip_validation,
-        skip_tests=args.skip_tests,
-        skip_equations=args.skip_equations,
-        max_fix_iterations=args.max_fix_iterations,
-        use_cache=not args.no_cache,
-        cache_dir=args.cache_dir,
-        verbose=args.verbose,
-    )
+    # Route to the appropriate pipeline
+    if args.mode == "agent":
+        run_agent(
+            pdf_url=args.pdf_url,
+            output_dir=args.output_dir,
+            provider_name=args.provider,
+            model_name=args.model,
+            enable_refine=args.refine,
+            enable_execution=args.execute,
+            enable_tests=not args.no_tests,
+            enable_evaluation=args.evaluate,
+            enable_devops=not args.no_devops,
+            interactive=args.interactive,
+            max_fix_iterations=args.max_fix_iterations,
+            max_refine_iterations=args.max_refine_iterations,
+            max_debug_iterations=args.max_debug_iterations,
+            reference_dir=args.reference_dir,
+            verbose=args.verbose,
+        )
+    else:
+        run_classic(
+            pdf_url=args.pdf_url,
+            output_dir=args.output_dir,
+            provider_name=args.provider,
+            model_name=args.model,
+            vision_provider_name=args.vision_provider,
+            vision_model_name=args.vision_model,
+            skip_validation=args.skip_validation,
+            skip_tests=args.skip_tests,
+            skip_equations=args.skip_equations,
+            max_fix_iterations=args.max_fix_iterations,
+            use_cache=not args.no_cache,
+            cache_dir=args.cache_dir,
+            verbose=args.verbose,
+        )
