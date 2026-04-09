@@ -23,6 +23,7 @@
 - [API Reference](API-Reference)
 - [Deployment & DevOps](Deployment-and-DevOps)
 - [Troubleshooting & FAQ](Troubleshooting-and-FAQ)
+- [PaperCoder Issues Analysis](PaperCoder-Issues-Analysis)
 
 ---
 

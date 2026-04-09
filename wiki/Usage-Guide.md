@@ -119,10 +119,13 @@ pip install -e ".[dev]"
 
 ## 3. Quick Start
 
-The simplest possible invocation requires only a PDF URL:
+The simplest possible invocation requires only a PDF URL or a local PDF path:
 
 ```bash
 python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
+
+# Or use a local PDF file
+python main.py --pdf_path ./papers/attention.pdf
 ```
 
 ### What Happens Step by Step
@@ -154,7 +157,8 @@ python main.py [OPTIONS]
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `--pdf_url URL` | string | *(required)* | URL of the research paper PDF (arXiv, OpenReview, direct link, etc.). Required unless using `--list-providers` or `--clear-cache`. |
+| `--pdf_url URL` | string | *(required)** | URL of the research paper PDF (arXiv, OpenReview, direct link, etc.). Either `--pdf_url` or `--pdf_path` must be provided (but not both). Not required when using `--list-providers` or `--clear-cache`. |
+| `--pdf_path PATH` | string | *(required)** | Path to a local PDF file. Either `--pdf_url` or `--pdf_path` must be provided (but not both). Not required when using `--list-providers` or `--clear-cache`. |
 | `--output_dir DIR` | string | `./generated_repo` | Target directory where the generated repository will be written. Created automatically if it does not exist. |
 | `--mode MODE` | choice | `classic` | Pipeline mode. `classic` runs the original v2.0 10-stage linear pipeline. `agent` runs the enhanced v3.0 multi-agent pipeline with decomposed planning, per-file analysis, and optional execution sandbox. |
 
@@ -219,6 +223,12 @@ These options apply when `--mode agent`.
 
 ```bash
 python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
+```
+
+**Use a local PDF file:**
+
+```bash
+python main.py --pdf_path ./papers/attention.pdf
 ```
 
 **Custom output directory:**

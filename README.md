@@ -145,6 +145,9 @@ pip install -e ".[all]"
 # Auto-detect provider
 python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
 
+# Use a local PDF file
+python main.py --pdf_path ./papers/attention.pdf
+
 # Specific provider and model
 python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider openai --model gpt-4o
 
@@ -345,8 +348,9 @@ Critical issues are auto-fixed up to N iterations (default: 2).
 ```
 python main.py [OPTIONS]
 
-Required:
+Required (one of):
   --pdf_url URL                URL of the research paper PDF
+  --pdf_path PATH              Path to a local PDF file
 
 Mode:
   --mode MODE                  classic (default) | agent

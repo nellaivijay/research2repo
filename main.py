@@ -13,6 +13,7 @@ Modes:
 
 Usage:
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
+  python main.py --pdf_path ./papers/attention.pdf --mode agent --refine
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --refine --execute
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --interactive
 """
@@ -101,6 +102,7 @@ def run_classic(
     use_cache: bool = True,
     cache_dir: Optional[str] = None,
     verbose: bool = False,
+    local_pdf_path: Optional[str] = None,
 ) -> None:
     """
     Run the classic 10-stage Research2Repo pipeline.
@@ -144,10 +146,15 @@ def run_classic(
 
     try:
         # ============================================================
-        # STAGE 1: Download PDF
+        # STAGE 1: Obtain PDF
         # ============================================================
-        print(f"[1/10] Download PDF")
-        download_pdf(pdf_url, temp_pdf_path)
+        if local_pdf_path:
+            print(f"[1/10] Using local PDF: {local_pdf_path}")
+            import shutil
+            shutil.copy2(local_pdf_path, temp_pdf_path)
+        else:
+            print(f"[1/10] Download PDF")
+            download_pdf(pdf_url, temp_pdf_path)
 
         # Check cache
         if cache and cache.has_generated_files(temp_pdf_path):
@@ -382,6 +389,7 @@ def run_agent(
     max_debug_iterations: int = 3,
     reference_dir: Optional[str] = None,
     verbose: bool = False,
+    local_pdf_path: Optional[str] = None,
 ) -> None:
     """
     Run the enhanced v3.0 agent pipeline.
@@ -409,9 +417,14 @@ def run_agent(
     os.makedirs(output_dir, exist_ok=True)
     temp_pdf_path = os.path.join(output_dir, "source_paper.pdf")
 
-    # Download PDF
-    print(f"[Download] Fetching paper...")
-    download_pdf(pdf_url, temp_pdf_path)
+    # Obtain PDF
+    if local_pdf_path:
+        print(f"[PDF] Using local file: {local_pdf_path}")
+        import shutil
+        shutil.copy2(local_pdf_path, temp_pdf_path)
+    else:
+        print(f"[Download] Fetching paper...")
+        download_pdf(pdf_url, temp_pdf_path)
 
     # Build orchestrator config
     config = {
@@ -490,6 +503,9 @@ Examples:
   # Classic mode (v2.0 compatible)
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
 
+  # Use a local PDF file instead of a URL
+  python main.py --pdf_path ./papers/attention.pdf
+
   # Agent mode with decomposed planning + self-refine
   python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --refine
 
@@ -513,6 +529,8 @@ Examples:
 
     # Core arguments
     parser.add_argument("--pdf_url", type=str, help="URL of the research paper PDF.")
+    parser.add_argument("--pdf_path", type=str,
+                        help="Path to a local PDF file (alternative to --pdf_url)")
     parser.add_argument("--output_dir", type=str, default="./generated_repo",
                         help="Target directory for generated repo (default: ./generated_repo)")
     parser.add_argument("--mode", type=str, default="classic",
@@ -593,14 +611,26 @@ Examples:
         print("Cache cleared.")
         sys.exit(0)
 
-    # Validate required args
-    if not args.pdf_url:
-        parser.error("--pdf_url is required (or use --list-providers / --clear-cache)")
+    # Validate required args — accept either --pdf_url or --pdf_path
+    if not args.pdf_url and not args.pdf_path:
+        parser.error("--pdf_url or --pdf_path is required (or use --list-providers / --clear-cache)")
+    if args.pdf_url and args.pdf_path:
+        parser.error("Specify either --pdf_url or --pdf_path, not both")
+
+    # Resolve local PDF: if --pdf_path given, convert to a file:// URL so
+    # the downstream download_pdf helper copies the local file.
+    pdf_source = args.pdf_url
+    local_pdf_path = None
+    if args.pdf_path:
+        local_pdf_path = os.path.abspath(args.pdf_path)
+        if not os.path.isfile(local_pdf_path):
+            parser.error(f"Local PDF not found: {local_pdf_path}")
+        pdf_source = local_pdf_path  # pass path directly; pipelines handle it
 
     # Route to the appropriate pipeline
     if args.mode == "agent":
         run_agent(
-            pdf_url=args.pdf_url,
+            pdf_url=pdf_source,
             output_dir=args.output_dir,
             provider_name=args.provider,
             model_name=args.model,
@@ -615,10 +645,11 @@ Examples:
             max_debug_iterations=args.max_debug_iterations,
             reference_dir=args.reference_dir,
             verbose=args.verbose,
+            local_pdf_path=local_pdf_path,
         )
     else:
         run_classic(
-            pdf_url=args.pdf_url,
+            pdf_url=pdf_source,
             output_dir=args.output_dir,
             provider_name=args.provider,
             model_name=args.model,
@@ -631,4 +662,5 @@ Examples:
             use_cache=not args.no_cache,
             cache_dir=args.cache_dir,
             verbose=args.verbose,
+            local_pdf_path=local_pdf_path,
         )
