@@ -65,12 +65,18 @@ class CodeValidator:
         self.provider = provider or get_provider(
             required_capability=ModelCapability.CODE_GENERATION
         )
+        self._last_fixed_paths: set[str] = set()
+
+    _prompt_cache: dict[str, str] = {}
 
     def _load_prompt(self, path: str) -> str:
-        if os.path.exists(path):
-            with open(path) as f:
-                return f.read()
-        return ""
+        if path not in self._prompt_cache:
+            if os.path.exists(path):
+                with open(path) as f:
+                    self._prompt_cache[path] = f.read()
+            else:
+                return ""
+        return self._prompt_cache[path]
 
     def validate(
         self,
@@ -153,7 +159,11 @@ class CodeValidator:
         Attempt to auto-fix critical issues identified in validation.
 
         Returns updated file dict with fixes applied.
+        Sets ``self._last_fixed_paths`` to the set of file paths whose
+        content was actually changed during this call.
         """
+        self._last_fixed_paths = set()
+
         critical_issues = [i for i in report.issues if i.severity == "critical"]
         if not critical_issues:
             print("  [Validator] No critical issues to fix.")
@@ -200,6 +210,11 @@ class CodeValidator:
                 fixed_content = fixed_content[:-3].rstrip()
 
             fixed_files[file_path] = fixed_content
+
+            # Track whether the content actually changed
+            if fixed_content != original_content:
+                self._last_fixed_paths.add(file_path)
+
             print(f"  [Validator] Fixed {file_path} ({len(issues)} issue(s))")
 
         return fixed_files

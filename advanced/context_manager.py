@@ -175,8 +175,12 @@ class ContextManager:
         summary = self._summarise_file(path, code)
         self._file_summaries.append(summary)
 
-        # Update cumulative summary
-        self._cumulative_summary = self._rebuild_cumulative_summary()
+        # Incrementally append to cumulative summary instead of rebuilding
+        new_section = self._format_single_summary(summary)
+        if self._cumulative_summary:
+            self._cumulative_summary += "\n\n" + new_section
+        else:
+            self._cumulative_summary = new_section
 
         print(f"  [ContextMgr] Recorded {path} "
               f"({summary.line_count} lines, "
@@ -390,6 +394,21 @@ class ContextManager:
     # ------------------------------------------------------------------
     # Cumulative summary
     # ------------------------------------------------------------------
+
+    def _format_single_summary(self, fs: "FileSummary") -> str:
+        """Format a single file summary into a text block."""
+        file_part = [f"### {fs.path} ({fs.line_count} lines)"]
+
+        if fs.classes:
+            file_part.append("  Classes: " + ", ".join(fs.classes[:5]))
+        if fs.functions:
+            file_part.append("  Functions: " + ", ".join(fs.functions[:8]))
+        if fs.key_algorithms:
+            file_part.append("  Algorithms: " + "; ".join(fs.key_algorithms[:3]))
+        if fs.dependencies:
+            file_part.append("  Deps: " + ", ".join(fs.dependencies[:5]))
+
+        return "\n".join(file_part)
 
     def _rebuild_cumulative_summary(self) -> str:
         """Rebuild the full cumulative summary from all file summaries."""

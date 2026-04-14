@@ -24,6 +24,10 @@ _PROVIDER_ENV_KEYS = {
     "ollama": None,  # always available if Ollama is running
 }
 
+import time as _time
+_AVAILABLE_CACHE: dict = {"timestamp": 0.0, "providers": None}
+_CACHE_TTL = 30  # seconds
+
 
 class ProviderRegistry:
     """Central registry for model providers."""
@@ -67,6 +71,10 @@ class ProviderRegistry:
     @staticmethod
     def detect_available() -> list[str]:
         """Detect which providers have credentials configured."""
+        now = _time.monotonic()
+        if _AVAILABLE_CACHE["providers"] is not None and (now - _AVAILABLE_CACHE["timestamp"]) < _CACHE_TTL:
+            return _AVAILABLE_CACHE["providers"]
+
         import os
         available = []
         for name, env_key in _PROVIDER_ENV_KEYS.items():
@@ -81,6 +89,9 @@ class ProviderRegistry:
                     pass
             elif os.environ.get(env_key):
                 available.append(name)
+
+        _AVAILABLE_CACHE["timestamp"] = now
+        _AVAILABLE_CACHE["providers"] = available
         return available
 
     @staticmethod
@@ -114,14 +125,19 @@ class ProviderRegistry:
         output_tokens: int,
     ) -> float:
         """Estimate cost in USD for a given usage."""
-        provider = ProviderRegistry.create(provider_name, model_name=model_name)
-        info = provider.model_info()
-        if not info:
+        if provider_name not in _PROVIDER_MAP:
             return 0.0
-        return (
-            (input_tokens / 1000) * info.cost_per_1k_input
-            + (output_tokens / 1000) * info.cost_per_1k_output
-        )
+        import importlib
+        module_path, class_name = _PROVIDER_MAP[provider_name]
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+        for model in cls.KNOWN_MODELS:
+            if model.name == model_name:
+                return (
+                    (input_tokens / 1000) * model.cost_per_1k_input
+                    + (output_tokens / 1000) * model.cost_per_1k_output
+                )
+        return 0.0
 
     @staticmethod
     def register(name: str, module_path: str, class_name: str, env_key: Optional[str] = None):

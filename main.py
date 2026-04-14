@@ -196,18 +196,24 @@ def run_classic(
         # STAGE 3: Extract Equations (Advanced)
         # ============================================================
         if not skip_equations:
-            print(f"\n[3/10] Running dedicated equation extraction...")
-            eq_extractor = EquationExtractor(provider=vision_provider or primary_provider)
-            paper_text = analysis.full_text or (uploaded_doc if isinstance(uploaded_doc, str) else "")
-            extracted_eqs = eq_extractor.extract(paper_text)
+            # Skip the expensive dedicated pass if the analyzer already found
+            # a reasonable number of equations (≥10 is a good heuristic).
+            if len(analysis.equations) >= 10:
+                print(f"\n[3/10] Skipping dedicated equation extraction "
+                      f"(analyzer already found {len(analysis.equations)} equations)")
+            else:
+                print(f"\n[3/10] Running dedicated equation extraction...")
+                eq_extractor = EquationExtractor(provider=vision_provider or primary_provider)
+                paper_text = analysis.full_text or (uploaded_doc if isinstance(uploaded_doc, str) else "")
+                extracted_eqs = eq_extractor.extract(paper_text)
 
-            # Merge with analysis equations
-            existing_latex = set(analysis.equations)
-            for eq in extracted_eqs:
-                if eq.latex and eq.latex not in existing_latex:
-                    analysis.equations.append(eq.latex)
-                    existing_latex.add(eq.latex)
-            print(f"  Total equations after merge: {len(analysis.equations)}")
+                # Merge with analysis equations
+                existing_latex = set(analysis.equations)
+                for eq in extracted_eqs:
+                    if eq.latex and eq.latex not in existing_latex:
+                        analysis.equations.append(eq.latex)
+                        existing_latex.add(eq.latex)
+                print(f"  Total equations after merge: {len(analysis.equations)}")
         else:
             print(f"\n[3/10] Skipping equation extraction (--skip-equations)")
 
@@ -322,10 +328,15 @@ def run_classic(
         # STAGE 10: Save Repository
         # ============================================================
         print(f"\n[10/10] Writing repository to {output_dir}...")
+        # Pre-create all needed directories in a single batch
+        needed_dirs = {os.path.dirname(os.path.join(output_dir, fp))
+                       for fp in generated_files}
+        for d in sorted(needed_dirs):
+            os.makedirs(d, exist_ok=True)
+
         files_written = 0
         for filepath, content in generated_files.items():
             full_path = os.path.join(output_dir, filepath)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w") as f:
                 f.write(content)
             files_written += 1

@@ -35,14 +35,20 @@ class PipelineCache:
     def __init__(self, cache_dir: Optional[str] = None):
         self.cache_dir = Path(cache_dir or self.DEFAULT_DIR)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._file_hash_cache: dict[str, str] = {}  # path -> truncated hex digest
 
     def _hash_file(self, file_path: str) -> str:
-        """SHA-256 hash of a file for cache keying."""
+        """SHA-256 hash of a file for cache keying (memoized per instance)."""
+        cached = self._file_hash_cache.get(file_path)
+        if cached is not None:
+            return cached
         h = hashlib.sha256()
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 h.update(chunk)
-        return h.hexdigest()[:16]
+        digest = h.hexdigest()[:16]
+        self._file_hash_cache[file_path] = digest
+        return digest
 
     def _hash_string(self, content: str) -> str:
         """SHA-256 hash of a string."""

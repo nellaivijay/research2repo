@@ -123,15 +123,17 @@ class AutoDebugger:
                 ))
                 break
 
-            # 2. Apply fixes
+            # 2. Apply fixes and track changes
+            old_files = files
             files = self._apply_fixes(files, fixes)
 
-            # 3. Write updated files to disk
+            # 3. Write only modified files to disk
             for rel_path, content in files.items():
-                abs_path = os.path.join(repo_dir, rel_path)
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                with open(abs_path, "w") as f:
-                    f.write(content)
+                if rel_path not in old_files or old_files[rel_path] != content:
+                    abs_path = os.path.join(repo_dir, rel_path)
+                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+                    with open(abs_path, "w") as f:
+                        f.write(content)
 
             # 4. Re-execute
             print(f"[AutoDebugger] Re-executing after applying {len(fixes)} fix(es)...")

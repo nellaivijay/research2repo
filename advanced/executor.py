@@ -17,6 +17,31 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+# Pre-compiled error-classification patterns (ordered most → least specific)
+_ERROR_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"ModuleNotFoundError",  re.IGNORECASE), "ModuleNotFoundError"),
+    (re.compile(r"ImportError",          re.IGNORECASE), "ImportError"),
+    (re.compile(r"SyntaxError",          re.IGNORECASE), "SyntaxError"),
+    (re.compile(r"IndentationError",     re.IGNORECASE), "IndentationError"),
+    (re.compile(r"NameError",            re.IGNORECASE), "NameError"),
+    (re.compile(r"TypeError",            re.IGNORECASE), "TypeError"),
+    (re.compile(r"ValueError",           re.IGNORECASE), "ValueError"),
+    (re.compile(r"AttributeError",       re.IGNORECASE), "AttributeError"),
+    (re.compile(r"KeyError",             re.IGNORECASE), "KeyError"),
+    (re.compile(r"IndexError",           re.IGNORECASE), "IndexError"),
+    (re.compile(r"FileNotFoundError",    re.IGNORECASE), "FileNotFoundError"),
+    (re.compile(r"ZeroDivisionError",    re.IGNORECASE), "ZeroDivisionError"),
+    (re.compile(r"RuntimeError",         re.IGNORECASE), "RuntimeError"),
+    (re.compile(r"cuda.*out of memory",  re.IGNORECASE), "CudaOOMError"),
+    (re.compile(r"OOM",                  re.IGNORECASE), "CudaOOMError"),
+    (re.compile(r"AssertionError",       re.IGNORECASE), "AssertionError"),
+    (re.compile(r"NotImplementedError",  re.IGNORECASE), "NotImplementedError"),
+    (re.compile(r"PermissionError",      re.IGNORECASE), "PermissionError"),
+    (re.compile(r"OSError",              re.IGNORECASE), "OSError"),
+    (re.compile(r"Traceback",            re.IGNORECASE), "UnclassifiedError"),
+]
+
+
 @dataclass
 class ExecutionResult:
     """Outcome of running a generated repository's entrypoint."""
@@ -332,32 +357,8 @@ class ExecutionSandbox:
         Returns the most specific Python exception class name found, or
         ``"UnknownError"`` if no recognisable pattern is matched.
         """
-        # Ordered from most to least specific
-        error_patterns: list[tuple[str, str]] = [
-            (r"ModuleNotFoundError",  "ModuleNotFoundError"),
-            (r"ImportError",          "ImportError"),
-            (r"SyntaxError",          "SyntaxError"),
-            (r"IndentationError",     "IndentationError"),
-            (r"NameError",            "NameError"),
-            (r"TypeError",            "TypeError"),
-            (r"ValueError",           "ValueError"),
-            (r"AttributeError",       "AttributeError"),
-            (r"KeyError",             "KeyError"),
-            (r"IndexError",           "IndexError"),
-            (r"FileNotFoundError",    "FileNotFoundError"),
-            (r"ZeroDivisionError",    "ZeroDivisionError"),
-            (r"RuntimeError",         "RuntimeError"),
-            (r"cuda.*out of memory",  "CudaOOMError"),
-            (r"OOM",                  "CudaOOMError"),
-            (r"AssertionError",       "AssertionError"),
-            (r"NotImplementedError",  "NotImplementedError"),
-            (r"PermissionError",      "PermissionError"),
-            (r"OSError",              "OSError"),
-            (r"Traceback",            "UnclassifiedError"),
-        ]
-
-        for pattern, error_name in error_patterns:
-            if re.search(pattern, stderr, re.IGNORECASE):
+        for compiled_re, error_name in _ERROR_PATTERNS:
+            if compiled_re.search(stderr):
                 return error_name
 
         return "UnknownError" if stderr.strip() else ""

@@ -8,6 +8,41 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
 
+import time as _time
+import functools
+
+
+def retry_on_error(max_retries: int = 2, backoff: float = 1.0):
+    """Decorator that retries LLM API calls on transient failures."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exc = None
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError, OSError) as exc:
+                    last_exc = exc
+                    if attempt < max_retries:
+                        wait = backoff * (2 ** attempt)
+                        print(f"  [Provider] Retry {attempt + 1}/{max_retries} "
+                              f"after {type(exc).__name__}, waiting {wait:.1f}s...")
+                        _time.sleep(wait)
+                except Exception as exc:
+                    # Non-transient errors: check for rate-limit indicators
+                    msg = str(exc).lower()
+                    if ("rate" in msg or "429" in msg or "quota" in msg) and attempt < max_retries:
+                        last_exc = exc
+                        wait = backoff * (2 ** attempt)
+                        print(f"  [Provider] Rate limited, retry {attempt + 1}/{max_retries} "
+                              f"in {wait:.1f}s...")
+                        _time.sleep(wait)
+                    else:
+                        raise
+            raise last_exc  # type: ignore[misc]
+        return wrapper
+    return decorator
+
 
 class ModelCapability(Enum):
     """Capabilities a model provider may support."""
@@ -59,6 +94,7 @@ class BaseProvider(ABC):
     def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         self.api_key = api_key
         self.model_name = model_name or self.default_model()
+        self._model_info_cache = None
 
     @abstractmethod
     def default_model(self) -> str:
@@ -116,10 +152,8 @@ class BaseProvider(ABC):
 
     def supports(self, capability: ModelCapability) -> bool:
         """Check if current model supports a given capability."""
-        for m in self.available_models():
-            if m.name == self.model_name:
-                return capability in m.capabilities
-        return False
+        info = self.model_info()
+        return info is not None and capability in info.capabilities
 
     def upload_file(self, file_path: str) -> object:
         """
@@ -131,8 +165,10 @@ class BaseProvider(ABC):
         )
 
     def model_info(self) -> Optional[ModelInfo]:
-        """Get info for the currently selected model."""
-        for m in self.available_models():
-            if m.name == self.model_name:
-                return m
-        return None
+        """Get info for the currently selected model (cached)."""
+        if self._model_info_cache is None:
+            for m in self.available_models():
+                if m.name == self.model_name:
+                    self._model_info_cache = m
+                    break
+        return self._model_info_cache

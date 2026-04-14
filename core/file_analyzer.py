@@ -13,6 +13,7 @@ Usage:
     analyses = fa.analyze_all(plan, paper_analysis)
 """
 
+import concurrent.futures
 import json
 import os
 from dataclasses import dataclass, field
@@ -159,16 +160,21 @@ class FileAnalyzer:
     # Prompt loading
     # ------------------------------------------------------------------
 
+    _prompt_cache: dict[str, str] = {}
+
     @staticmethod
     def _load_prompt(path: str, **kwargs: object) -> str:
         """Load a prompt template and substitute ``{{key}}`` placeholders."""
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                template = fh.read()
-            for key, value in kwargs.items():
-                template = template.replace(f"{{{{{key}}}}}", str(value))
-            return template
-        return ""
+        if path not in FileAnalyzer._prompt_cache:
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as fh:
+                    FileAnalyzer._prompt_cache[path] = fh.read()
+            else:
+                return ""
+        template = FileAnalyzer._prompt_cache[path]
+        for key, value in kwargs.items():
+            template = template.replace(f"{{{{{key}}}}}", str(value))
+        return template
 
     # ------------------------------------------------------------------
     # Context builders
@@ -225,23 +231,25 @@ class FileAnalyzer:
 
     @staticmethod
     def _build_prior_context(prior_analyses: dict[str, "FileAnalysis"]) -> str:
-        """Summarise previously analysed files for cross-file consistency."""
+        """Summarise previously analysed files for cross-file consistency.
+
+        Uses a compact format: class names, top-5 function names, and
+        top-5 imports per file to keep the context concise.
+        """
         if not prior_analyses:
             return ""
         parts: list[str] = ["\n## Previously Analyzed Files"]
         for path, fa in prior_analyses.items():
             parts.append(f"\n### {path}")
             if fa.classes:
-                for cls in fa.classes:
-                    bases = f"({', '.join(cls.get('base_classes', []))})" if cls.get("base_classes") else ""
-                    parts.append(f"  class {cls['name']}{bases}")
-                    for m in cls.get("methods", []):
-                        parts.append(f"    - {m}")
+                class_names = [cls.get("name", "?") for cls in fa.classes]
+                parts.append(f"  classes: {', '.join(class_names)}")
             if fa.functions:
-                for fn in fa.functions:
-                    parts.append(f"  def {fn['name']}({', '.join(fn.get('args', []))}) -> {fn.get('return_type', '...')}")
+                fn_names = [fn.get("name", "?") for fn in fa.functions[:5]]
+                suffix = f" (+{len(fa.functions) - 5} more)" if len(fa.functions) > 5 else ""
+                parts.append(f"  functions: {', '.join(fn_names)}{suffix}")
             if fa.imports:
-                parts.append(f"  imports: {', '.join(fa.imports[:15])}")
+                parts.append(f"  imports: {', '.join(fa.imports[:5])}")
         return "\n".join(parts)
 
     # ------------------------------------------------------------------
@@ -254,6 +262,8 @@ class FileAnalyzer:
         analysis: PaperAnalysis,
         plan: ArchitecturePlan,
         prior_analyses: dict[str, "FileAnalysis"],
+        paper_context: Optional[str] = None,
+        plan_context: Optional[str] = None,
     ) -> FileAnalysis:
         """
         Produce a ``FileAnalysis`` for a single file.
@@ -264,6 +274,10 @@ class FileAnalyzer:
             plan: The architecture plan containing all files.
             prior_analyses: Analyses computed for earlier files, keyed by
                             file path.
+            paper_context: Pre-built paper context string.  If *None*, it
+                           is built on the fly (for backward compatibility).
+            plan_context: Pre-built plan context string.  If *None*, it is
+                          built on the fly (for backward compatibility).
 
         Returns:
             A populated ``FileAnalysis`` instance.
@@ -272,10 +286,14 @@ class FileAnalyzer:
         if not prompt_template:
             prompt_template = _default_prompt()
 
+        # Use pre-built contexts when available; fall back to building them.
+        _paper_ctx = paper_context if paper_context is not None else self._build_paper_context(analysis)
+        _plan_ctx = plan_context if plan_context is not None else self._build_plan_context(plan)
+
         context = "\n\n".join(
             filter(None, [
-                self._build_paper_context(analysis),
-                self._build_plan_context(plan),
+                _paper_ctx,
+                _plan_ctx,
                 self._build_prior_context(prior_analyses),
             ])
         )
@@ -335,6 +353,10 @@ class FileAnalyzer:
         (which is typically sorted by priority).  Each subsequent file
         receives the analyses of all preceding files as additional context.
 
+        Files are processed in batches of up to 4 concurrently using a
+        thread pool.  All files within a batch share the same snapshot of
+        prior analyses so that they can run in parallel without conflicts.
+
         Args:
             plan: The architecture plan with ordered file specs.
             analysis: The full paper analysis.
@@ -347,15 +369,40 @@ class FileAnalyzer:
 
         print(f"[FileAnalyzer] Starting per-file analysis for {total} files...")
 
-        for idx, file_spec in enumerate(plan.files, 1):
-            print(f"[FileAnalyzer] Analyzing {file_spec.path}... ({idx}/{total})")
-            fa = self.analyze_file(
-                file_spec=file_spec,
-                analysis=analysis,
-                plan=plan,
-                prior_analyses=results,
-            )
-            results[file_spec.path] = fa
+        # Pre-build static contexts once (identical for every file).
+        paper_ctx = self._build_paper_context(analysis)
+        plan_ctx = self._build_plan_context(plan)
+
+        BATCH_SIZE = 4
+        file_list = list(plan.files)
+
+        for batch_start in range(0, total, BATCH_SIZE):
+            batch = file_list[batch_start : batch_start + BATCH_SIZE]
+
+            # Snapshot prior_analyses so every file in the batch sees the
+            # same context (results accumulated from previous batches).
+            prior_snapshot = dict(results)
+
+            def _analyze_one(file_spec: FileSpec, _idx: int = batch_start) -> FileAnalysis:
+                idx = file_list.index(file_spec) + 1
+                print(f"[FileAnalyzer] Analyzing {file_spec.path}... ({idx}/{total})")
+                return self.analyze_file(
+                    file_spec=file_spec,
+                    analysis=analysis,
+                    plan=plan,
+                    prior_analyses=prior_snapshot,
+                    paper_context=paper_ctx,
+                    plan_context=plan_ctx,
+                )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
+                futures = {
+                    executor.submit(_analyze_one, fs): fs for fs in batch
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    fs = futures[future]
+                    fa = future.result()
+                    results[fs.path] = fa
 
         print(f"[FileAnalyzer] Per-file analysis complete: {len(results)} files analyzed.")
         return results

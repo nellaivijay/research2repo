@@ -15,6 +15,7 @@ Usage:
     context = rag.get_reference_context("model/encoder.py", index)
 """
 
+import hashlib
 import json
 import os
 import re
@@ -56,6 +57,7 @@ class CodeRAGIndex:
     total_files_indexed: int = 0
     mappings: list[FileMapping] = field(default_factory=list)
     repo_contents: dict[str, list[ReferenceFile]] = field(default_factory=dict)
+    file_lookup: dict[str, str] = field(default_factory=dict)
 
 
 # Confidence scores by relationship type
@@ -112,6 +114,25 @@ class CodeRAG:
         "Return a JSON object:\n"
         '{{"mappings": [\n'
         '  {{"target_file": "path", "relationship": "direct_match|partial_match|reference|utility", '
+        '"relevant_snippets": ["snippet1"]}}\n'
+        "]}}\n\n"
+        "Relationship types:\n"
+        "- direct_match: implements the same component\n"
+        "- partial_match: implements a related component\n"
+        "- reference: useful architectural pattern\n"
+        "- utility: helper code that could be adapted\n\n"
+        "Only include files with genuine relevance.  Respond with ONLY the JSON."
+    )
+
+    _BATCH_MAPPING_PROMPT = (
+        "Analyze the following reference code files and determine their relevance to "
+        "each target file in the repository being generated.\n\n"
+        "{ref_files_section}\n\n"
+        "## Target Files:\n{target_files}\n\n"
+        "Return a JSON object:\n"
+        '{{"mappings": [\n'
+        '  {{"reference_file": "repo/path", "target_file": "path", '
+        '"relationship": "direct_match|partial_match|reference|utility", '
         '"relevant_snippets": ["snippet1"]}}\n'
         "]}}\n\n"
         "Relationship types:\n"
@@ -183,6 +204,9 @@ class CodeRAG:
             if files:
                 index.repo_contents[repo_name] = files
                 index.total_files_indexed += len(files)
+                # Populate file_lookup for O(1) content retrieval
+                for f in files:
+                    index.file_lookup[f"{repo_name}/{f.path}"] = f.content
 
         if index.total_files_indexed == 0:
             print("  [CodeRAG] No files fetched; skipping mapping.")
@@ -231,7 +255,8 @@ class CodeRAG:
         for mapping in relevant[:max_snippets]:
             # Find the actual file content
             content = self._find_file_content(
-                mapping.reference_file, index.repo_contents
+                mapping.reference_file, index.repo_contents,
+                file_lookup=index.file_lookup,
             )
             if not content:
                 continue
@@ -315,10 +340,33 @@ class CodeRAG:
         if token:
             headers["Authorization"] = f"token {token}"
 
+        # Set up file-based cache directory
+        cache_dir = os.path.join(".r2r_cache", "github_search")
+        os.makedirs(cache_dir, exist_ok=True)
+
         seen = set()
         results = []
 
         for query in queries:
+            # Check cache first
+            query_hash = hashlib.sha256(
+                f"{query} language:python".encode()
+            ).hexdigest()
+            cache_path = os.path.join(cache_dir, f"{query_hash}.json")
+
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, "r") as fh:
+                        cached_items = json.load(fh)
+                    for item in cached_items:
+                        full_name = item.get("full_name", "")
+                        if full_name and full_name not in seen:
+                            seen.add(full_name)
+                            results.append(item)
+                    continue
+                except Exception:
+                    pass  # Cache corrupted; fall through to API call
+
             try:
                 resp = requests.get(
                     "https://api.github.com/search/repositories",
@@ -333,7 +381,15 @@ class CodeRAG:
                 if resp.status_code != 200:
                     continue
 
-                for item in resp.json().get("items", []):
+                query_results = resp.json().get("items", [])
+                # Save to cache
+                try:
+                    with open(cache_path, "w") as fh:
+                        json.dump(query_results, fh)
+                except Exception:
+                    pass
+
+                for item in query_results:
                     full_name = item.get("full_name", "")
                     if full_name and full_name not in seen:
                         seen.add(full_name)
@@ -446,24 +502,40 @@ class CodeRAG:
         repo_contents: dict[str, list[ReferenceFile]],
         target_files: list[str],
     ) -> list[FileMapping]:
-        """Use LLM to map reference files to target files with confidence."""
+        """Use LLM to map reference files to target files with confidence.
+
+        Files are processed in batches of 5 per LLM call for efficiency.
+        """
         target_listing = "\n".join(f"  - {f}" for f in target_files)
         mappings: list[FileMapping] = []
 
         for repo_name, files in repo_contents.items():
-            for ref_file in files:
-                # Skip very small files
-                if len(ref_file.content.strip()) < 50:
-                    continue
+            # Filter out very small files
+            eligible_files = [
+                rf for rf in files if len(rf.content.strip()) >= 50
+            ]
 
-                # Truncate for prompt
-                content_for_prompt = ref_file.content[:3000]
-                if len(ref_file.content) > 3000:
-                    content_for_prompt += "\n# ... (truncated)"
+            # Process in batches of 5
+            for batch_start in range(0, len(eligible_files), 5):
+                batch = eligible_files[batch_start:batch_start + 5]
 
-                prompt = self._MAPPING_PROMPT.format(
-                    ref_path=f"{repo_name}/{ref_file.path}",
-                    ref_content=content_for_prompt,
+                # Build the reference files section for the batch
+                ref_files_section_parts = []
+                batch_file_keys = []
+                for ref_file in batch:
+                    full_ref_path = f"{repo_name}/{ref_file.path}"
+                    batch_file_keys.append(full_ref_path)
+                    content_for_prompt = ref_file.content[:3000]
+                    if len(ref_file.content) > 3000:
+                        content_for_prompt += "\n# ... (truncated)"
+                    ref_files_section_parts.append(
+                        f"## Reference File: {full_ref_path}\n"
+                        f"```\n{content_for_prompt}\n```"
+                    )
+                ref_files_section = "\n\n".join(ref_files_section_parts)
+
+                prompt = self._BATCH_MAPPING_PROMPT.format(
+                    ref_files_section=ref_files_section,
                     target_files=target_listing,
                 )
 
@@ -483,8 +555,15 @@ class CodeRAG:
                     for m in data.get("mappings", []):
                         relationship = m.get("relationship", "reference")
                         confidence = _CONFIDENCE_SCORES.get(relationship, 0.5)
+                        ref_file_path = m.get("reference_file", "")
+                        # Validate the reference_file is from this batch
+                        if ref_file_path not in batch_file_keys:
+                            if len(batch) == 1:
+                                ref_file_path = batch_file_keys[0]
+                            else:
+                                continue
                         mappings.append(FileMapping(
-                            reference_file=f"{repo_name}/{ref_file.path}",
+                            reference_file=ref_file_path,
                             target_file=m.get("target_file", ""),
                             confidence=confidence,
                             relationship=relationship,
@@ -503,8 +582,20 @@ class CodeRAG:
         self,
         reference_path: str,
         repo_contents: dict[str, list[ReferenceFile]],
+        file_lookup: Optional[dict[str, str]] = None,
     ) -> str:
-        """Look up the content of a reference file by its full path."""
+        """Look up the content of a reference file by its full path.
+
+        Uses the file_lookup dict for O(1) access when available,
+        falling back to linear search over repo_contents.
+        """
+        # Fast path: use pre-built lookup dict
+        if file_lookup:
+            result = file_lookup.get(reference_path)
+            if result is not None:
+                return result
+
+        # Slow fallback: linear search
         for repo_name, files in repo_contents.items():
             for f in files:
                 full_path = f"{repo_name}/{f.path}"

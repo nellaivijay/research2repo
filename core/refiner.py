@@ -384,6 +384,17 @@ class SelfRefiner:
                 print(f"  [SelfRefiner] No issues found — skipping refinement.")
                 break
 
+            # Early exit if only minor issues remain after first iteration
+            if iteration > 1:
+                critical_keywords = {"critical", "major", "missing", "incorrect", "wrong"}
+                has_critical = any(
+                    any(kw in issue.lower() for kw in critical_keywords)
+                    for issue in issues
+                )
+                if not has_critical:
+                    print(f"  [SelfRefiner] Only minor issues remain — stopping early.")
+                    break
+
             # --- Refine ---
             print(f"  [SelfRefiner] Refining (iteration {iteration})...")
             refined = self.refine_artifact(

@@ -20,6 +20,7 @@ imports and to keep import time low when only a subset of stages is used.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 import time
@@ -138,6 +139,16 @@ class AgentOrchestrator:
         provider = self._provider
         timings: dict[str, str] = {}
 
+        # Initialize cache for agent mode (same as classic mode)
+        cache = None
+        if cfg.get("enable_caching", True):
+            try:
+                from advanced.cache import PipelineCache
+                cache_dir = cfg.get("cache_dir", ".r2r_cache")
+                cache = PipelineCache(cache_dir)
+            except ImportError:
+                pass
+
         # Accumulator for final results
         result: dict[str, Any] = {
             "files": {},
@@ -156,13 +167,21 @@ class AgentOrchestrator:
         t0 = time.time()
         _header("Parse Paper", 1)
 
-        analysis, document, vision_context = self._stage_parse_paper(
-            pdf_path=pdf_path,
-            paper_analysis=paper_analysis,
-            document=document,
-            vision_context=vision_context,
-            provider=provider,
-        )
+        if cache and cache.has_analysis(pdf_path) and paper_analysis is None:
+            analysis = cache.load_analysis(pdf_path)
+            document = document  # keep as-is
+            vision_context = vision_context
+            print(f"  ✓ Loaded analysis from cache")
+        else:
+            analysis, document, vision_context = self._stage_parse_paper(
+                pdf_path=pdf_path,
+                paper_analysis=paper_analysis,
+                document=document,
+                vision_context=vision_context,
+                provider=provider,
+            )
+            if cache:
+                cache.save_analysis(pdf_path, analysis)
         result["analysis"] = analysis
         timings["parse"] = _elapsed(t0)
         print(f"  ✓ Paper: {analysis.title}  ({timings['parse']})")
@@ -173,12 +192,18 @@ class AgentOrchestrator:
         t0 = time.time()
         _header("Planning", 2)
 
-        plan = self._stage_plan(analysis, document, vision_context, provider)
+        if cache and cache.has_architecture(pdf_path):
+            plan = cache.load_architecture(pdf_path)
+            print(f"  ✓ Loaded plan from cache")
+        else:
+            plan = self._stage_plan(analysis, document, vision_context, provider)
 
-        if cfg["enable_refine"]:
-            plan = self._refine_output(
-                plan, "plan", provider, cfg["max_refine_iterations"],
-            )
+            if cfg["enable_refine"]:
+                plan = self._refine_output(
+                    plan, "plan", provider, cfg["max_refine_iterations"],
+                )
+            if cache:
+                cache.save_architecture(pdf_path, plan)
 
         result["plan"] = plan
         timings["plan"] = _elapsed(t0)
@@ -191,55 +216,74 @@ class AgentOrchestrator:
 
         # ==============================================================
         # Stage 3 — Per-file analysis
+        # Stage 3b — Document Segmentation (large papers)  [parallel]
+        # Stage 3c — CodeRAG (Reference Code Mining)       [parallel]
         # ==============================================================
         t0 = time.time()
         _header("Per-File Analysis", 3)
 
-        file_analyses = self._stage_file_analysis(plan, analysis, provider)
-
-        if cfg["enable_refine"]:
-            file_analyses = self._refine_output(
-                file_analyses, "file_analyses", provider,
-                cfg["max_refine_iterations"],
-            )
-
-        result["file_analyses"] = file_analyses
-        timings["file_analysis"] = _elapsed(t0)
-        print(f"  ✓ Analysed {len(file_analyses)} files  "
-              f"({timings['file_analysis']})")
-
-        # ==============================================================
-        # Stage 3b — Document Segmentation (large papers)
-        # ==============================================================
-        segmentation_result = None
+        # Determine which optional stages should run
         paper_text = getattr(analysis, "full_text", "") or (
             document if isinstance(document, str) else ""
         )
-        if cfg.get("enable_segmentation", True) and len(paper_text) > 40_000:
-            t0 = time.time()
-            _header("Document Segmentation", "3b")
-            segmentation_result = self._stage_segmentation(paper_text)
-            timings["segmentation"] = _elapsed(t0)
-            seg_count = len(segmentation_result.segments) if segmentation_result else 0
-            print(f"  ✓ Segmented paper into {seg_count} chunks  "
-                  f"({timings['segmentation']})")
-        else:
-            if cfg.get("enable_segmentation", True):
-                print(f"\n  [Segmenter] Paper within token limits "
-                      f"({len(paper_text):,} chars); segmentation not needed.")
+        run_segmentation = (
+            cfg.get("enable_segmentation", True) and len(paper_text) > 40_000
+        )
+        run_code_rag = cfg.get("enable_code_rag", False)
 
-        # ==============================================================
-        # Stage 3c — CodeRAG (Reference Code Mining)
-        # ==============================================================
+        # Launch 3b and 3c in background threads while 3 runs in foreground
+        segmentation_result = None
         code_rag_index = None
-        if cfg.get("enable_code_rag", False):
-            t0 = time.time()
-            _header("CodeRAG — Reference Mining", "3c")
-            code_rag_index = self._stage_code_rag(analysis, plan, provider)
-            timings["code_rag"] = _elapsed(t0)
-            mapping_count = len(code_rag_index.mappings) if code_rag_index else 0
-            print(f"  ✓ CodeRAG: {mapping_count} file mappings  "
-                  f"({timings['code_rag']})")
+        bg_futures: dict[str, concurrent.futures.Future] = {}
+
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        try:
+            if run_segmentation:
+                bg_futures["segmentation"] = executor.submit(
+                    self._stage_segmentation, paper_text,
+                )
+            if run_code_rag:
+                bg_futures["code_rag"] = executor.submit(
+                    self._stage_code_rag, analysis, plan, provider,
+                )
+
+            # Stage 3 runs in the main thread
+            file_analyses = self._stage_file_analysis(plan, analysis, provider)
+
+            if cfg["enable_refine"]:
+                file_analyses = self._refine_output(
+                    file_analyses, "file_analyses", provider,
+                    cfg["max_refine_iterations"],
+                )
+
+            result["file_analyses"] = file_analyses
+            timings["file_analysis"] = _elapsed(t0)
+            print(f"  ✓ Analysed {len(file_analyses)} files  "
+                  f"({timings['file_analysis']})")
+
+            # Collect 3b result
+            if "segmentation" in bg_futures:
+                _header("Document Segmentation", "3b")
+                segmentation_result = bg_futures["segmentation"].result()
+                timings["segmentation"] = _elapsed(t0)
+                seg_count = len(segmentation_result.segments) if segmentation_result else 0
+                print(f"  ✓ Segmented paper into {seg_count} chunks  "
+                      f"({timings['segmentation']})")
+            else:
+                if cfg.get("enable_segmentation", True):
+                    print(f"\n  [Segmenter] Paper within token limits "
+                          f"({len(paper_text):,} chars); segmentation not needed.")
+
+            # Collect 3c result
+            if "code_rag" in bg_futures:
+                _header("CodeRAG — Reference Mining", "3c")
+                code_rag_index = bg_futures["code_rag"].result()
+                timings["code_rag"] = _elapsed(t0)
+                mapping_count = len(code_rag_index.mappings) if code_rag_index else 0
+                print(f"  ✓ CodeRAG: {mapping_count} file mappings  "
+                      f"({timings['code_rag']})")
+        finally:
+            executor.shutdown(wait=False)
 
         # ==============================================================
         # Stage 4 — Code generation (with ContextManager)

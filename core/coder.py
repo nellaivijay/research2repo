@@ -6,8 +6,11 @@ Generates files one at a time in dependency order, feeding previously
 generated files as context for later ones to ensure consistency.
 """
 
+import concurrent.futures
 import json
 import os
+from collections import defaultdict, deque
+from threading import Lock
 from typing import Optional
 
 from providers.base import BaseProvider, GenerationConfig, ModelCapability
@@ -36,66 +39,31 @@ class CodeSynthesizer:
             required_capability=ModelCapability.CODE_GENERATION
         )
 
+    _prompt_cache: dict[str, str] = {}
+
     def _load_prompt(self, path: str, **kwargs) -> str:
-        if os.path.exists(path):
-            with open(path) as f:
-                template = f.read()
-            for key, value in kwargs.items():
-                template = template.replace(f"{{{{{key}}}}}", str(value))
-            return template
-        return ""
+        if path not in self._prompt_cache:
+            if os.path.exists(path):
+                with open(path) as f:
+                    self._prompt_cache[path] = f.read()
+            else:
+                return ""
+        template = self._prompt_cache[path]
+        for key, value in kwargs.items():
+            template = template.replace(f"{{{{{key}}}}}", str(value))
+        return template
 
-    def generate_codebase(
-        self,
-        analysis: PaperAnalysis,
-        plan: ArchitecturePlan,
-        document: Optional[object] = None,
-    ) -> dict[str, str]:
-        """
-        Generate all files specified in the architecture plan.
-
-        Args:
-            analysis: Paper analysis with equations, hyperparams, etc.
-            plan: Architecture plan with file specifications.
-            document: Optional uploaded document handle (Gemini).
-
-        Returns:
-            Dict mapping file paths to their generated content.
-        """
-        print(f"  [Coder] Generating {len(plan.files)} files...")
-
-        generated: dict[str, str] = {}
-
-        for i, file_spec in enumerate(plan.files):
-            print(f"  [Coder] ({i+1}/{len(plan.files)}) Generating {file_spec.path}...")
-
-            content = self._generate_single_file(
-                file_spec=file_spec,
-                analysis=analysis,
-                plan=plan,
-                generated_so_far=generated,
-                document=document,
-            )
-            generated[file_spec.path] = content
-
-        print(f"  [Coder] Code generation complete: {len(generated)} files.")
-        return generated
-
-    def _generate_single_file(
-        self,
-        file_spec: FileSpec,
-        analysis: PaperAnalysis,
-        plan: ArchitecturePlan,
-        generated_so_far: dict[str, str],
-        document: Optional[object] = None,
+    def _build_static_context(
+        self, analysis: PaperAnalysis, plan: ArchitecturePlan
     ) -> str:
-        """Generate a single file with full context."""
+        """
+        Build the portion of the prompt context that is identical for every
+        file: paper title, architecture description, equations, hyperparameters,
+        loss functions, repository structure, and Mermaid diagrams.
 
-        prompt = self._load_prompt(self.PROMPT_FILE)
-        if not prompt:
-            prompt = self._default_prompt()
-
-        # Build context
+        This is computed once in generate_codebase() and reused across all
+        _generate_single_file() calls to avoid redundant work.
+        """
         context_parts = [
             f"# Paper: {analysis.title}",
             f"\n## Architecture Description\n{analysis.architecture_description}",
@@ -122,17 +90,164 @@ class CodeSynthesizer:
         # Include architecture plan context
         context_parts.append(f"\n## Repository Structure\n{plan.directory_tree}")
 
-        # Include dependency files (previously generated)
-        dep_context = self._get_dependency_context(file_spec, generated_so_far)
-        if dep_context:
-            context_parts.append("\n## Already Generated Dependencies")
-            context_parts.append(dep_context)
-
         # Include Mermaid diagrams
         if analysis.diagrams_mermaid:
             context_parts.append("\n## Architecture Diagrams")
             for d in analysis.diagrams_mermaid:
                 context_parts.append(f"```mermaid\n{d}\n```")
+
+        return "\n".join(context_parts)
+
+    def _compute_depth_levels(
+        self, files: list[FileSpec]
+    ) -> list[list[FileSpec]]:
+        """
+        Group files by dependency depth using topological sort.
+
+        Files at the same depth level have no inter-dependencies and can
+        be generated in parallel.  Level 0 contains files with no
+        dependencies (or whose dependencies are not part of this plan).
+
+        Returns:
+            List of lists — each inner list is one depth level.
+        """
+        path_to_spec: dict[str, FileSpec] = {fs.path: fs for fs in files}
+        # Only consider dependencies that are within the plan
+        plan_paths = set(path_to_spec.keys())
+
+        # Build in-degree map and adjacency list
+        in_degree: dict[str, int] = {fs.path: 0 for fs in files}
+        dependents: dict[str, list[str]] = defaultdict(list)
+
+        for fs in files:
+            for dep in fs.dependencies:
+                if dep in plan_paths:
+                    in_degree[fs.path] += 1
+                    dependents[dep].append(fs.path)
+
+        # BFS-style topological sort by depth level
+        levels: list[list[FileSpec]] = []
+        queue = deque(p for p, deg in in_degree.items() if deg == 0)
+
+        while queue:
+            level_paths = list(queue)
+            queue.clear()
+            level = [path_to_spec[p] for p in level_paths]
+            levels.append(level)
+            for p in level_paths:
+                for dep in dependents[p]:
+                    in_degree[dep] -= 1
+                    if in_degree[dep] == 0:
+                        queue.append(dep)
+
+        # Any remaining files (cycles) are appended as a final level
+        remaining = [path_to_spec[p] for p in in_degree if in_degree[p] > 0]
+        if remaining:
+            levels.append(remaining)
+
+        return levels
+
+    def generate_codebase(
+        self,
+        analysis: PaperAnalysis,
+        plan: ArchitecturePlan,
+        document: Optional[object] = None,
+    ) -> dict[str, str]:
+        """
+        Generate all files specified in the architecture plan.
+
+        Args:
+            analysis: Paper analysis with equations, hyperparams, etc.
+            plan: Architecture plan with file specifications.
+            document: Optional uploaded document handle (Gemini).
+
+        Returns:
+            Dict mapping file paths to their generated content.
+        """
+        print(f"  [Coder] Generating {len(plan.files)} files...")
+
+        # Build static context once — shared across every file generation call
+        static_context = self._build_static_context(analysis, plan)
+
+        generated: dict[str, str] = {}
+        generated_lock = Lock()
+        file_counter = [0]  # mutable counter for thread-safe progress
+
+        # Group files by dependency depth for parallel generation
+        depth_levels = self._compute_depth_levels(plan.files)
+
+        for depth, level in enumerate(depth_levels):
+            # All files in a level can be generated in parallel
+            if len(level) == 1:
+                # Single file — no need for a thread pool
+                fs = level[0]
+                file_counter[0] += 1
+                print(
+                    f"  [Coder] ({file_counter[0]}/{len(plan.files)}) "
+                    f"Generating {fs.path}..."
+                )
+                content = self._generate_single_file(
+                    file_spec=fs,
+                    static_context=static_context,
+                    plan=plan,
+                    generated_so_far=generated,
+                    document=document,
+                )
+                generated[fs.path] = content
+            else:
+                # Multiple independent files — generate in parallel
+                def _gen(fs: FileSpec) -> tuple[str, str]:
+                    with generated_lock:
+                        file_counter[0] += 1
+                        idx = file_counter[0]
+                        # Snapshot generated_so_far under lock
+                        snapshot = dict(generated)
+                    print(
+                        f"  [Coder] ({idx}/{len(plan.files)}) "
+                        f"Generating {fs.path}..."
+                    )
+                    content = self._generate_single_file(
+                        file_spec=fs,
+                        static_context=static_context,
+                        plan=plan,
+                        generated_so_far=snapshot,
+                        document=document,
+                    )
+                    return fs.path, content
+
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=min(len(level), 4)
+                ) as executor:
+                    futures = {executor.submit(_gen, fs): fs for fs in level}
+                    for future in concurrent.futures.as_completed(futures):
+                        path, content = future.result()
+                        generated[path] = content
+
+        print(f"  [Coder] Code generation complete: {len(generated)} files.")
+        return generated
+
+    def _generate_single_file(
+        self,
+        file_spec: FileSpec,
+        static_context: str,
+        plan: ArchitecturePlan,
+        generated_so_far: dict[str, str],
+        document: Optional[object] = None,
+    ) -> str:
+        """Generate a single file with full context."""
+
+        prompt = self._load_prompt(self.PROMPT_FILE)
+        if not prompt:
+            prompt = self._default_prompt()
+
+        # Build context — start with pre-built static context
+        context_parts = [static_context]
+
+        # Include dependency files (previously generated)
+        dep_context = self._get_dependency_context(file_spec, generated_so_far)
+        if dep_context:
+            context_parts.append("\n## Already Generated Dependencies")
+            context_parts.append(dep_context)
 
         # File-specific instruction
         file_instruction = (
@@ -188,10 +303,12 @@ class CodeSynthesizer:
     ) -> str:
         """Get content of dependency files for context."""
         parts = []
+        seen: set[str] = set()
 
         # Direct dependencies
         for dep_path in file_spec.dependencies:
             if dep_path in generated:
+                seen.add(dep_path)
                 content = generated[dep_path]
                 # Truncate very long files
                 if len(content) > 3000:
@@ -199,12 +316,15 @@ class CodeSynthesizer:
                 parts.append(f"\n### {dep_path}\n```python\n{content}\n```")
 
         # Also include recent files (rolling context window, last 3)
-        recent_paths = [p for p in list(generated.keys())[-3:] if p not in file_spec.dependencies]
+        all_paths = list(generated.keys())
+        recent_paths = all_paths[-3:] if len(all_paths) >= 3 else all_paths
         for path in recent_paths:
-            content = generated[path]
-            if len(content) > 1500:
-                content = content[:1500] + "\n# ... (truncated)"
-            parts.append(f"\n### {path} (recent)\n```python\n{content}\n```")
+            if path not in seen:
+                seen.add(path)
+                content = generated[path]
+                if len(content) > 1500:
+                    content = content[:1500] + "\n# ... (truncated)"
+                parts.append(f"\n### {path} (recent)\n```python\n{content}\n```")
 
         return "\n".join(parts) if parts else ""
 

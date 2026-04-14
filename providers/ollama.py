@@ -4,6 +4,7 @@ Ollama provider — local/self-hosted models (Llama, CodeLlama, Mistral, DeepSee
 
 import json
 import os
+import time
 from typing import Optional
 
 import requests
@@ -94,14 +95,22 @@ class OllamaProvider(BaseProvider):
     ):
         super().__init__(api_key=api_key, model_name=model_name)
         self.host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        self._session = requests.Session()
+        self._models_cache = None
+        self._models_cache_time = 0.0
 
     def default_model(self) -> str:
         return "deepseek-coder-v2:latest"
 
     def available_models(self) -> list[ModelInfo]:
+        # Return cached result if within TTL (60 seconds)
+        now = time.monotonic()
+        if self._models_cache is not None and (now - self._models_cache_time) < 60:
+            return self._models_cache
+
         # Merge known models with what's actually available locally
         try:
-            resp = requests.get(f"{self.host}/api/tags", timeout=5)
+            resp = self._session.get(f"{self.host}/api/tags", timeout=5)
             resp.raise_for_status()
             local_models = [m["name"] for m in resp.json().get("models", [])]
         except Exception:
@@ -118,6 +127,9 @@ class OllamaProvider(BaseProvider):
                     max_output_tokens=2_048,
                     capabilities=[ModelCapability.TEXT_GENERATION],
                 ))
+
+        self._models_cache = models
+        self._models_cache_time = now
         return models
 
     def generate(
@@ -147,7 +159,7 @@ class OllamaProvider(BaseProvider):
         if cfg.response_format == "json":
             payload["format"] = "json"
 
-        response = requests.post(
+        response = self._session.post(
             f"{self.host}/api/generate",
             json=payload,
             timeout=600,

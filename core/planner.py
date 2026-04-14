@@ -332,7 +332,9 @@ class DecomposedPlanner:
     # Step 1 — Overall Plan
     # ------------------------------------------------------------------
 
-    def _step1_overall_plan(self, analysis: PaperAnalysis) -> OverallPlan:
+    def _step1_overall_plan(
+        self, analysis: PaperAnalysis, paper_ctx: Optional[str] = None,
+    ) -> OverallPlan:
         """Extract a high-level implementation roadmap from the paper."""
         print("  [Planner] Step 1/4: Generating overall plan...")
 
@@ -340,7 +342,8 @@ class DecomposedPlanner:
         if not prompt_template:
             prompt_template = _default_overall_plan_prompt()
 
-        paper_ctx = self._paper_context(analysis)
+        if paper_ctx is None:
+            paper_ctx = self._paper_context(analysis)
         full_prompt = f"{paper_ctx}\n\n---\n\n{prompt_template}"
 
         try:
@@ -376,6 +379,7 @@ class DecomposedPlanner:
         self,
         analysis: PaperAnalysis,
         overall_plan: OverallPlan,
+        paper_ctx: Optional[str] = None,
     ) -> ArchitectureDesign:
         """Design file structure and Mermaid class/sequence diagrams."""
         print("  [Planner] Step 2/4: Designing architecture...")
@@ -384,7 +388,8 @@ class DecomposedPlanner:
         if not prompt_template:
             prompt_template = _default_arch_design_prompt()
 
-        paper_ctx = self._paper_context(analysis)
+        if paper_ctx is None:
+            paper_ctx = self._paper_context(analysis)
         plan_ctx = (
             "\n## Overall Plan\n"
             f"Core components: {', '.join(overall_plan.core_components)}\n"
@@ -430,6 +435,7 @@ class DecomposedPlanner:
         analysis: PaperAnalysis,
         overall_plan: OverallPlan,
         arch_design: ArchitectureDesign,
+        paper_ctx: Optional[str] = None,
     ) -> LogicDesign:
         """Determine dependency graph, execution order, and per-file logic."""
         print("  [Planner] Step 3/4: Designing logic and dependencies...")
@@ -438,7 +444,8 @@ class DecomposedPlanner:
         if not prompt_template:
             prompt_template = _default_logic_design_prompt()
 
-        paper_ctx = self._paper_context(analysis)
+        if paper_ctx is None:
+            paper_ctx = self._paper_context(analysis)
         plan_summary = f"\n## Overall Plan Summary\n{overall_plan.summary}\n"
 
         arch_ctx_parts: list[str] = ["\n## Architecture Design\n### File List"]
@@ -667,14 +674,17 @@ class DecomposedPlanner:
         """
         print("[Planner] Starting decomposed planning pipeline (4 steps)...")
 
+        # Build paper context once and reuse across steps 1-3
+        paper_ctx = self._paper_context(analysis)
+
         # Step 1
-        overall_plan = self._step1_overall_plan(analysis)
+        overall_plan = self._step1_overall_plan(analysis, paper_ctx=paper_ctx)
 
         # Step 2
-        arch_design = self._step2_architecture_design(analysis, overall_plan)
+        arch_design = self._step2_architecture_design(analysis, overall_plan, paper_ctx=paper_ctx)
 
         # Step 3
-        logic_design = self._step3_logic_design(analysis, overall_plan, arch_design)
+        logic_design = self._step3_logic_design(analysis, overall_plan, arch_design, paper_ctx=paper_ctx)
 
         # Step 4
         config_content = self._step4_config_generation(
