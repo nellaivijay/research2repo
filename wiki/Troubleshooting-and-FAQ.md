@@ -92,6 +92,17 @@ provider = get_provider(provider_name="gemini", api_key="your-api-key-here")
 3. **Use caching** to avoid re-running stages. Caching is enabled by default; previous successful stages will not be re-executed.
 4. **Upgrade your API plan** for higher rate limits.
 
+### Automatic Retry & Rate Limit Handling
+
+Research2Repo automatically retries failed API calls with exponential backoff:
+
+- **Transient errors** (`ConnectionError`, `TimeoutError`, `OSError`): retried automatically
+- **Rate limits** (HTTP 429 / quota errors): detected and retried after a delay
+- **Default behavior**: 2 retries with exponential backoff (1s, 2s, 4s, ...)
+- **Non-transient errors**: raised immediately without retry
+
+The retry decorator (`retry_on_error`) is defined in `providers/base.py` and can be applied to any provider method. No user configuration is needed — retries happen transparently.
+
 ---
 
 #### "Context too long" / "Token limit exceeded"

@@ -716,7 +716,10 @@ Parse -> Plan -> File Analysis -> Code Gen -> Tests -> Validate -> Execute -> De
 ```
 
 This means:
-- **No parallelism** within a single paper run (each stage needs the prior stage's output).
+- **Stages run sequentially** (each stage needs the prior stage's output), **but within stages, parallel execution is used**:
+  - **Code generation** uses dependency-depth parallelism (`ThreadPoolExecutor`, up to 4 workers) — files at the same dependency depth are generated concurrently.
+  - **File analysis** runs in batches of 4 concurrently.
+  - **Stages 3b (segmentation) and 3c (CodeRAG)** run in background threads alongside Stage 3, overlapping their work with code generation.
 - **Bottleneck is LLM latency**, not local compute.
 - A typical paper takes 2-10 minutes depending on provider, paper length, and enabled features.
 

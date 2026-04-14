@@ -129,6 +129,20 @@ class R2RConfig:
 | `cache_dir` | `str` | `".r2r_cache"` | `R2R_CACHE_DIR` | Cache directory path |
 | `verbose` | `bool` | `False` | `R2R_VERBOSE` | Enable verbose output |
 
+#### Adaptive Token Limits
+
+`R2RConfig.max_tokens_for_file(file_path: str) -> int` returns an appropriate token budget based on file type:
+
+| File Pattern | Token Limit |
+|-------------|-------------|
+| `.yaml`, `.yml`, `.toml`, `.cfg`, `.txt` | 2,048 |
+| `.md` | 2,048 |
+| `model`, `network`, `encoder`, `decoder` in path | 12,288 |
+| `train`, `trainer` in path | 10,240 |
+| `test` in path | 6,144 |
+| `config`, `utils`, `__init__` in path | 4,096 |
+| Default | 8,192 |
+
 **Produced by:** `R2RConfig.from_env()` classmethod or direct instantiation.
 **Consumed by:** `main.py` classic pipeline, passed as parameters to individual modules.
 

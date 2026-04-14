@@ -1,4 +1,4 @@
-# Research2Repo v3.0
+# Research2Repo v3.1
 
 **Multi-model agentic framework that converts ML research papers into production-ready GitHub repositories.**
 
@@ -15,6 +15,10 @@ Supports **Google Gemini**, **OpenAI GPT-4o/o3**, **Anthropic Claude**, and **Ol
 | **CodeRAG** | Mine GitHub for reference implementations; LLM-scored file-to-file relevance mappings with confidence scores |
 | **Document Segmentation** | Content-aware paper chunking for papers exceeding token limits; preserves algorithm blocks and equation chains |
 | **Context Manager** | Clean-slate context with cumulative code summaries — prevents context overflow during multi-file generation |
+| **Parallel Execution** | Dependency-aware parallel file generation and batch file analysis using ThreadPoolExecutor |
+| **Pipeline Caching (Agent Mode)** | Agent mode now caches analysis and architecture results (previously only classic mode had caching) |
+| **Retry with Backoff** | Automatic retry with exponential backoff for transient API failures and rate limits (429) |
+| **Adaptive Token Limits** | Per-file token budgets based on file type (model files get 12K, config files get 2K, etc.) |
 
 ## What's New in v3.0
 
@@ -482,6 +486,55 @@ Misc:
 
 ---
 
+## Performance & Efficiency
+
+### Parallel Execution
+
+File generation and analysis run in parallel when files have no inter-dependencies:
+
+- **Code generation**: Files are grouped by dependency depth via topological sort. Files at the same depth level are generated concurrently (up to 4 threads).
+- **File analysis**: Processed in batches of 4 using `ThreadPoolExecutor`. Each batch shares a frozen snapshot of prior analyses.
+- **Pipeline stages**: Stages 3b (segmentation) and 3c (CodeRAG) run in background threads alongside stage 3 (file analysis).
+
+### Caching
+
+Both classic and agent mode support `PipelineCache`:
+- Content-addressed via SHA-256 hash of the source PDF
+- Caches analysis, architecture plans, generated files, and validation reports
+- Disable with `--no-cache`, clear with `--clear-cache`
+
+### Retry & Resilience
+
+All provider calls use automatic retry with exponential backoff:
+- Retries on `ConnectionError`, `TimeoutError`, `OSError`
+- Detects rate limits (HTTP 429 / quota errors) and waits before retrying
+- Default: 2 retries, backoff factor 1.0 (waits 1s, 2s, 4s, ...)
+
+### Adaptive Token Limits
+
+Token budgets are assigned per file type via `R2RConfig.max_tokens_for_file()`:
+
+| File Type | Token Limit |
+|-----------|-------------|
+| Model / Network / Encoder / Decoder | 12,288 |
+| Training / Trainer | 10,240 |
+| Test files | 6,144 |
+| Config / Utils / `__init__` | 4,096 |
+| YAML / TOML / Markdown / Text | 2,048 |
+| Default (other `.py`) | 8,192 |
+
+### Timeout Configuration
+
+Configurable via `R2RConfig` (defaults shown):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `llm_generation_timeout` | 600s | Max time for a single LLM generation call |
+| `validation_timeout` | 300s | Max time for code validation |
+| `execution_timeout` | 900s | Max time for sandbox execution |
+
+---
+
 ## Comparison with PaperCoder & DeepCode
 
 | Feature | Research2Repo v3.1 | PaperCoder | DeepCode |
@@ -502,6 +555,9 @@ Misc:
 | CodeRAG (ref mining) | GitHub search + LLM indexing | No | Codebase indexing |
 | Document segmentation | 4 strategies, algorithm-preserving | No | 5 strategies |
 | Context management | Clean-slate + cumulative summaries | Rolling window | Concise memory agent |
+| Parallel execution | Dependency-depth threading (4 workers) | No | No |
+| Retry with backoff | Exponential backoff, rate-limit aware | No | No |
+| Adaptive token limits | Per-file-type budgets (2K-12K) | Fixed | Fixed |
 
 ---
 

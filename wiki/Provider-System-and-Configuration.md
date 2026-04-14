@@ -471,6 +471,25 @@ python main.py --pdf_url "..." --provider openai
 # Result: openai is used
 ```
 
+### Timeout Settings
+
+| Config Field | Default | Description |
+|-------------|---------|-------------|
+| `llm_generation_timeout` | 600 | Max seconds per LLM call |
+| `validation_timeout` | 300 | Max seconds for validation pass |
+| `execution_timeout` | 900 | Max seconds for sandbox execution |
+
+These values are defined in `R2RConfig` and can be overridden programmatically.
+
+### Retry Behavior
+
+All provider API calls are wrapped with `retry_on_error(max_retries=2, backoff=1.0)`:
+
+- Transient errors (connection, timeout): automatic retry with exponential backoff
+- Rate limits (429 / quota): detected and retried
+- Backoff schedule: 1s, 2s, 4s (doubling each attempt)
+- Non-recoverable errors are raised immediately
+
 ### Agent Mode Configuration
 
 The `AgentOrchestrator` accepts a configuration dict with these keys and defaults:
