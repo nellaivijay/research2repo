@@ -1,136 +1,73 @@
-# Research2Repo v3.1
+# Research2Repo
 
-**Multi-model agentic framework that converts ML research papers into production-ready GitHub repositories.**
+**Educational agentic framework for converting research papers into implementation repositories**
 
-Inspired by [PaperCoder](https://arxiv.org/abs/2504.17192) — implements decomposed planning, per-file analysis, self-refine loops, execution sandbox, and multi-agent orchestration on top of Research2Repo's multi-model provider system.
+Research2Repo is an open source educational tool designed to help students and researchers understand how to convert academic research papers into production-ready code repositories. It demonstrates advanced concepts in agentic AI systems, multi-model integration, and automated software development.
 
-Supports **Google Gemini**, **OpenAI GPT-4o/o3**, **Anthropic Claude**, and **Ollama** (local models). Uses long-context single-pass architecture — no RAG, no chunking, no lost context.
+## Educational Purpose
 
----
+This tool serves educational purposes by helping students and researchers:
+- Learn about agentic AI architectures and multi-agent systems
+- Understand multi-model LLM integration patterns
+- Practice automated code generation and validation
+- Study research-to-implementation workflows
+- Explore self-refine loops and automated debugging
+- Gain hands-on experience with software automation
 
-## What's New in v3.1 (DeepCode-Inspired)
+## Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **CodeRAG** | Mine GitHub for reference implementations; LLM-scored file-to-file relevance mappings with confidence scores |
-| **Document Segmentation** | Content-aware paper chunking for papers exceeding token limits; preserves algorithm blocks and equation chains |
-| **Context Manager** | Clean-slate context with cumulative code summaries — prevents context overflow during multi-file generation |
-| **Parallel Execution** | Dependency-aware parallel file generation and batch file analysis using ThreadPoolExecutor |
-| **Pipeline Caching (Agent Mode)** | Agent mode now caches analysis and architecture results (previously only classic mode had caching) |
-| **Retry with Backoff** | Automatic retry with exponential backoff for transient API failures and rate limits (429) |
-| **Adaptive Token Limits** | Per-file token budgets based on file type (model files get 12K, config files get 2K, etc.) |
+- **Multi-Model Support**: Integration with Google Gemini, OpenAI GPT-4o, Anthropic Claude, and local models via Ollama
+- **Agentic Architecture**: Multi-agent system with decomposed planning and specialized agents
+- **Self-Refine Loops**: Verify and refine artifacts at each pipeline stage
+- **Execution Sandbox**: Docker and local sandbox environments for running generated code
+- **Auto-Debug**: Automated error analysis and fixing for common Python error types
+- **Reference Mining**: GitHub CodeRAG for finding reference implementations
+- **Long-Context Processing**: Single-pass architecture preserving context without chunking
+- **Multi-Backend PDF Parsing**: Support for GROBID, doc2json, PyMuPDF, PyPDF2
 
-## What's New in v3.0
+## Advanced Features
 
-| Feature | Description |
-|---------|-------------|
-| **Decomposed Planning** | 4-stage planning: overall plan, architecture design (UML), logic design, config generation |
-| **Per-File Analysis** | Deep per-file specification before code generation (+0.23 ablation improvement per PaperCoder) |
-| **Self-Refine Loops** | Verify/refine cycles at every pipeline stage to catch errors early |
-| **Execution Sandbox** | Docker/local sandbox to actually run generated code |
-| **Auto-Debug** | Iterative error analysis + fix when execution fails (supports 19+ Python error types) |
-| **DevOps Generation** | Auto-generates Dockerfile, docker-compose, Makefile, GitHub Actions CI, setup.py |
-| **Reference Evaluation** | Score generated repo against a reference implementation |
-| **Interactive Mode** | Pause after planning to review architecture before code generation |
-| **Structured Paper Parsing** | Multi-backend PDF parsing (GROBID, doc2json, PyMuPDF, PyPDF2) |
-| **Multi-Agent Architecture** | Pluggable agent system with base class, message passing, orchestrator |
+### Decomposed Planning
+Four-stage planning process: overall plan → architecture design (UML) → logic design → config generation
 
----
+### Per-File Analysis
+Deep specification generation for each file before code implementation
 
-## Architecture
+### Self-Refine Loops
+Verify-then-refine cycles at every pipeline stage to catch errors early
 
-### Classic Mode (v2.0 compatible)
+### Execution Sandbox
+Docker and local sandbox environments to actually run and validate generated code
 
-```
-PDF --> [Analyzer] --> [Equation Extractor] --> [Architect] --> [Coder] --> [Validator] --> Repo
-           |                    |                    |              |             |
-      Long-Context         Vision/LaTeX         Structured     Rolling       Self-Review
-      + Multimodal         Extraction           JSON Output    Context       + Auto-Fix
-```
+### Auto-Debug
+Iterative error analysis and automatic fixing for common Python errors
 
-### Agent Mode (v3.0 + v3.1)
+### Context Management
+Clean-slate context with cumulative code summaries to prevent context overflow
 
-```
-PDF --> [Paper Parser] --> [Decomposed Planner] --> [Per-File Analyzer] --> [Doc Segmenter]
-           |                    |                        |                       |
-       Multi-backend     4-stage decomposed        Deep per-file          Auto-segments
-       (GROBID/PyMuPDF)  + UML diagrams            specification         large papers
-                                |                        |                       |
-                         [Self-Refine]             [Self-Refine]          [CodeRAG (opt)]
-                                                                              |
-                                                                    GitHub ref mining
-                                                                              |
-                                                                    [Context-Managed Coder]
-                                                                              |
-                                                                    Clean-slate context
-                                                                    + cumulative summaries
-                                                                              |
-                                                                       [Validator]
-                                                                              |
-                                                                    [Execution Sandbox]
-                                                                              |
-                                                                    [Auto-Debugger]
-                                                                              |
-                                                                    [DevOps Generator]
-                                                                              |
-                                                                    [Evaluator] --> Repository
-```
+### Document Segmentation
+Content-aware chunking for papers exceeding token limits while preserving structure
 
-### Agent Mode Pipeline Stages
+### CodeRAG
+Mine GitHub for reference implementations with confidence-scored mappings
 
-| Stage | Module | What It Does |
-|-------|--------|-------------|
-| 1 | `PaperAnalyzer` | Long-context analysis + vision diagram extraction |
-| 2 | `DecomposedPlanner` | 4-stage planning: overall -> architecture (UML) -> logic -> config |
-| 3 | `FileAnalyzer` | Per-file deep analysis with accumulated context |
-| 3b | `DocumentSegmenter` | Semantic segmentation for papers exceeding token limits (v3.1) |
-| 3c | `CodeRAG` | Mine GitHub for reference implementations with confidence-scored mappings (v3.1) |
-| 4 | `CodeSynthesizer` + `ContextManager` | File-by-file generation with clean-slate context + cumulative summaries (v3.1) |
-| 5 | `TestGenerator` | Auto-generated pytest suite |
-| 6 | `CodeValidator` | Self-review + iterative auto-fix loop |
-| 7 | `ExecutionSandbox` + `AutoDebugger` | Run code in Docker/local sandbox, auto-debug failures |
-| 8 | `DevOpsGenerator` | Generate Dockerfile, Makefile, CI, docker-compose, setup.py |
-| 9 | `ReferenceEvaluator` | Score against reference implementation (1-5 scale) |
-| 10 | Save | Write all files + metadata to output directory |
+## Quick Start
 
-### Self-Refine at Every Stage
-
-Each planning/analysis artifact goes through a verify-then-refine loop:
-
-```
-Artifact --> [Verify] --> issues found? --> [Refine] --> re-verify --> ... (up to N iterations)
-                |
-                no issues --> pass through unchanged
-```
-
-### Multi-Model Provider System
-
-```
-providers/
-  base.py              # Abstract interface + capabilities enum
-  gemini.py            # Google Gemini (2.5 Pro, 2.0 Flash, 1.5 Pro)
-  openai_provider.py   # OpenAI (GPT-4o, GPT-4-turbo, o3, o1)
-  anthropic_provider.py # Anthropic (Claude Sonnet 4, Opus 4, 3.5 Sonnet)
-  ollama.py            # Local models (DeepSeek, Llama, CodeLlama, Mistral)
-  registry.py          # Auto-detection, fallback chains, cost estimation
-```
-
-**Key design:** Each provider implements `generate()`, `generate_structured()`, and optionally `upload_file()` + `generate_with_file()`. The registry auto-detects available providers from environment variables and picks the best one for each capability (long-context, vision, code generation, structured output).
-
----
-
-## Installation
+### Installation
 
 ```bash
-git clone https://github.com/nellaivijay/Research2Repo.git
+# Clone the repository
+git clone https://github.com/nellaivijay/research2repo.git
 cd Research2Repo
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### Provider Setup (pick one or more)
+### Provider Setup
 
 ```bash
-# Google Gemini (recommended — 2M token context + vision)
+# Google Gemini (recommended)
 export GEMINI_API_KEY="your_key_here"
 
 # OpenAI GPT-4o
@@ -141,506 +78,133 @@ pip install openai
 export ANTHROPIC_API_KEY="your_key_here"
 pip install anthropic
 
-# Ollama (local, free)
+# Ollama (local models)
 # Install from https://ollama.ai, then:
 ollama pull deepseek-coder-v2
 ```
 
-### Optional: Enhanced Vision (diagram extraction from PDF pages)
+### Basic Usage
 
 ```bash
-pip install PyMuPDF
-```
+# Classic mode with auto-detected provider
+python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf"
 
-### Install all providers at once
+# Agent mode with decomposed planning
+python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent
 
-```bash
-pip install -e ".[all]"
-```
+# Agent mode with self-refine loops
+python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent --refine
 
----
-
-## Usage
-
-### Classic Mode (v2.0 compatible)
-
-```bash
-# Auto-detect provider
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
-
-# Use a local PDF file
-python main.py --pdf_path ./papers/attention.pdf
-
-# Specific provider and model
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider openai --model gpt-4o
-
-# Mix providers
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --provider gemini --vision-provider anthropic
-
-# Fast run (skip validation and tests)
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --skip-validation --skip-tests
-```
-
-### Agent Mode (v3.0)
-
-```bash
-# Basic agent mode with decomposed planning
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent
-
-# With self-refine loops (verify/refine each stage)
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --refine
-
-# With execution sandbox + auto-debug
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --execute
-
-# Interactive planning review
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --interactive
+# Agent mode with execution sandbox and auto-debug
+python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent --execute
 
 # Full pipeline with all features
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent \
-  --refine --execute --evaluate --reference-dir ./reference_impl
-
-# Enable CodeRAG: mine GitHub for reference code (v3.1)
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --code-rag
-
-# Full v3.1 pipeline with CodeRAG + all features
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent \
-  --code-rag --refine --execute
-
-# Disable context manager (use legacy rolling-window context)
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent --no-context-manager
-
-# Evaluate against reference implementation
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" --mode agent \
-  --evaluate --reference-dir ./path/to/reference/repo
+python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent --refine --execute
 ```
 
-### Utility Commands
+## Architecture
 
-```bash
-python main.py --list-providers     # List available providers and models
-python main.py --clear-cache        # Clear all cached data
+### Classic Mode
+```
+PDF → [Analyzer] → [Equation Extractor] → [Architect] → [Coder] → [Validator] → Repository
 ```
 
----
+### Agent Mode
+```
+PDF → [Paper Parser] → [Decomposed Planner] → [Per-File Analyzer] → [Doc Segmenter]
+  → [Self-Refine] → [CodeRAG] → [Context-Managed Coder] → [Validator] → [Execution Sandbox]
+  → [Auto-Debugger] → [DevOps Generator] → [Evaluator] → Repository
+```
+
+## Pipeline Stages
+
+1. **PaperAnalyzer**: Long-context analysis with vision diagram extraction
+2. **DecomposedPlanner**: 4-stage planning (overall → architecture → logic → config)
+3. **FileAnalyzer**: Per-file deep analysis with accumulated context
+4. **DocumentSegmenter**: Semantic segmentation for large papers
+5. **CodeRAG**: Mine GitHub for reference implementations
+6. **CodeSynthesizer**: File-by-file generation with context management
+7. **TestGenerator**: Auto-generated pytest suite
+8. **CodeValidator**: Self-review and iterative auto-fix
+9. **ExecutionSandbox**: Run code in sandbox environment
+10. **AutoDebugger**: Iterative error fixing
+11. **DevOpsGenerator**: Generate Dockerfile, CI, Makefile
+12. **ReferenceEvaluator**: Score against reference implementation
+
+## Multi-Model Provider System
+
+- **Base Provider**: Abstract interface with capabilities enum
+- **Gemini Provider**: Google Gemini (2.5 Pro, 2.0 Flash, 1.5 Pro)
+- **OpenAI Provider**: GPT-4o, GPT-4-turbo, o3, o1
+- **Anthropic Provider**: Claude Sonnet 4, Opus 4, 3.5 Sonnet
+- **Ollama Provider**: Local models (DeepSeek, Llama, CodeLlama, Mistral)
+- **Registry**: Auto-detection, fallback chains, cost estimation
 
 ## Project Structure
 
 ```
 Research2Repo/
-  main.py                          # CLI entry point: classic + agent modes
-  config.py                        # Global configuration
-
-  providers/                       # Multi-model abstraction layer
-    __init__.py
-    base.py                        # BaseProvider ABC + ModelCapability enum
-    gemini.py                      # Google Gemini provider
-    openai_provider.py             # OpenAI GPT provider
-    anthropic_provider.py          # Anthropic Claude provider
-    ollama.py                      # Local Ollama provider
-    registry.py                    # Auto-detection + factory
-
-  core/                            # Pipeline stages
-    __init__.py
-    analyzer.py                    # PaperAnalyzer — PDF ingestion + structured analysis
-    architect.py                   # SystemArchitect — repo structure design
-    coder.py                       # CodeSynthesizer — file-by-file code generation
-    validator.py                   # CodeValidator — self-review + auto-fix
-    planner.py                     # DecomposedPlanner — 4-stage planning (v3.0)
-    file_analyzer.py               # FileAnalyzer — per-file deep analysis (v3.0)
-    refiner.py                     # SelfRefiner — verify/refine loops (v3.0)
-    paper_parser.py                # PaperParser — multi-backend PDF parsing (v3.0)
-
-  advanced/                        # Advanced capabilities
-    __init__.py
-    equation_extractor.py          # Dedicated equation extraction (LaTeX + PyTorch)
-    config_generator.py            # YAML config from hyperparameters
-    test_generator.py              # Auto pytest suite generation
-    cache.py                       # Content-addressed pipeline cache
-    executor.py                    # ExecutionSandbox — Docker/local runner (v3.0)
-    debugger.py                    # AutoDebugger — iterative error fixing (v3.0)
-    evaluator.py                   # ReferenceEvaluator — scoring (v3.0)
-    devops.py                      # DevOpsGenerator — Dockerfile, CI, Makefile (v3.0)
-    code_rag.py                    # CodeRAG — GitHub reference mining + indexing (v3.1)
-    document_segmenter.py          # DocumentSegmenter — semantic paper chunking (v3.1)
-    context_manager.py             # ContextManager — clean-slate context + summaries (v3.1)
-
-  agents/                          # Multi-agent architecture (v3.0)
-    __init__.py
-    base.py                        # BaseAgent ABC + AgentMessage
-    orchestrator.py                # AgentOrchestrator — master 10-stage controller
-
-  prompts/                         # Externalized prompt templates
-    analyzer.txt                   # Paper analysis prompt
-    architect.txt                  # Repo design prompt
-    coder.txt                      # Code generation prompt
-    validator.txt                  # Validation prompt
-    diagram_extractor.txt          # Vision diagram extraction prompt
-    equation_extractor.txt         # Equation extraction prompt
-    test_generator.txt             # Test generation prompt
-    overall_plan.txt               # Overall plan extraction (v3.0)
-    architecture_design.txt        # Architecture design with UML (v3.0)
-    logic_design.txt               # Logic design + dependency graph (v3.0)
-    file_analysis.txt              # Per-file analysis prompt (v3.0)
-    self_refine_verify.txt         # Self-refine verification (v3.0)
-    self_refine_refine.txt         # Self-refine refinement (v3.0)
-    auto_debug.txt                 # Auto-debug prompt (v3.0)
-    reference_eval.txt             # Reference evaluation prompt (v3.0)
-    devops.txt                     # DevOps generation prompt (v3.0)
-
-  tests/                           # Project tests
-    __init__.py
-
-  pyproject.toml                   # Package metadata + optional deps
-  requirements.txt                 # Dependencies
-  .gitignore
-  LICENSE                          # Apache 2.0
+├── main.py                    # CLI entry point
+├── config.py                  # Global configuration
+├── providers/                 # Multi-model abstraction
+│   ├── base.py
+│   ├── gemini.py
+│   ├── openai_provider.py
+│   ├── anthropic_provider.py
+│   ├── ollama.py
+│   └── registry.py
+├── core/                      # Pipeline stages
+│   ├── analyzer.py
+│   ├── architect.py
+│   ├── coder.py
+│   ├── validator.py
+│   ├── planner.py
+│   ├── file_analyzer.py
+│   ├── refiner.py
+│   └── paper_parser.py
+├── advanced/                  # Advanced capabilities
+│   ├── equation_extractor.py
+│   ├── config_generator.py
+│   ├── test_generator.py
+│   ├── cache.py
+│   ├── executor.py
+│   ├── debugger.py
+│   ├── evaluator.py
+│   ├── devops.py
+│   ├── code_rag.py
+│   ├── document_segmenter.py
+│   └── context_manager.py
+├── agents/                    # Multi-agent architecture
+│   ├── base.py
+│   └── orchestrator.py
+├── prompts/                   # Prompt templates
+├── tests/                     # Test suite
+└── requirements.txt
 ```
 
----
+## Development
 
-## How It Works
+### Adding New Providers
 
-### 1. Zero-RAG Long-Context Analysis
+Implement the `BaseProvider` interface in `providers/` directory following existing patterns.
 
-Traditional paper-to-code tools chunk the paper and use RAG, which disconnects hyperparameters (appendix) from equations (Section 3). Research2Repo sends the **entire paper** to the model in a single pass:
+### Testing
 
-- **Gemini:** Uploads PDF via File API (2M+ token context)
-- **OpenAI/Anthropic:** Extracts text via PyPDF2, fits within 128K-200K context
-- **Ollama:** Extracts text, uses what fits in the local model's context window
-
-### 2. Decomposed Planning (v3.0)
-
-Instead of a single architecture pass, the planner decomposes into 4 stages:
-
-1. **Overall Plan** — Extract core components, methods, training objectives, evaluation protocols
-2. **Architecture Design** — File list + Mermaid class/sequence diagrams + module relationships
-3. **Logic Design** — Execution order, dependency graph, per-file specifications
-4. **Config Generation** — Structured YAML from hyperparameters
-
-Each stage can be independently refined through the self-refine loop.
-
-### 3. Per-File Analysis
-
-Before code generation, each file in the plan gets a deep analysis that includes:
-- Classes and functions to implement
-- Import dependencies (internal + external)
-- Algorithms from the paper to implement
-- Input/output specifications
-- Test criteria
-
-This accumulated context feeds into the code generation stage, improving output quality (+0.23 in PaperCoder ablation studies).
-
-### 4. Self-Refine Loops
-
-Every artifact (plan, file analysis, generated code) can be verified and refined:
-
-1. **Verify** — Critique the artifact for issues (with severity assessment)
-2. **Refine** — If issues found, generate an improved version
-3. **Iterate** — Repeat up to N times or until no issues remain
-
-### 5. Execution Sandbox + Auto-Debug
-
-Generated code is actually executed in a sandboxed environment:
-
-- **Docker mode** — Builds a container, runs with resource limits
-- **Local mode** — Fallback with subprocess isolation
-- **Auto-debug** — When execution fails, analyzes the error, generates targeted fixes, and re-runs (supports 19+ Python error types including ImportError, TypeError, CudaOOMError)
-
-### 6. Rolling Context Code Generation
-
-Files are generated in dependency order (config -> utils -> model components -> training -> tests). Each file receives:
-- Full paper analysis (equations, hyperparameters, architecture)
-- Previously generated dependency files
-- Architecture plan with file descriptions
-- Per-file analysis results
-- Mermaid diagrams
-
-### 6b. Context Manager (v3.1) — Clean-Slate Generation
-
-The v3.1 ContextManager replaces the rolling-window approach with a "clean-slate" strategy inspired by DeepCode's memory agent:
-
-1. **After each file**, a compact summary is generated (classes, functions, key algorithms)
-2. **Before each new file**, the context is rebuilt from scratch:
-   - Architecture plan (always)
-   - Cumulative code summary (compressed representation of all prior files)
-   - Full source of direct dependencies only
-   - Reference code from CodeRAG (if enabled)
-   - File-specific generation instructions
-3. This prevents context overflow when generating 20+ files while maintaining cross-file coherence.
-
-### 6c. CodeRAG (v3.1) — Reference Code Mining
-
-When `--code-rag` is enabled, the pipeline:
-
-1. **Generates search queries** from the paper (title, key components, algorithms)
-2. **Searches GitHub** for relevant reference implementations (sorted by stars)
-3. **Downloads and indexes** source files from top repositories
-4. **Scores relevance** using the LLM: each reference file is mapped to target files with confidence scores:
-   - `direct_match` (1.0): implements the same component
-   - `partial_match` (0.8): related component
-   - `reference` (0.6): useful architectural pattern
-   - `utility` (0.4): adaptable helper code
-5. During code generation, relevant reference snippets are injected as context.
-
-### 6d. Document Segmentation (v3.1) — Large Paper Support
-
-Papers exceeding token limits are automatically segmented using content-aware strategies:
-
-- **Algorithm preservation**: Algorithm blocks are never split mid-procedure
-- **Equation chain grouping**: Related equations stay together
-- **Section-aware splitting**: Respects logical section boundaries with overlap
-- **4 strategies** selected automatically based on document characteristics:
-  - `semantic_research_focused`: Default for standard papers
-  - `algorithm_preserve_integrity`: For algorithm-heavy papers
-  - `concept_implementation_hybrid`: For papers with both algorithms and heavy math
-  - `content_aware_segmentation`: For ML/DL-specific papers
-
-### 7. Self-Review Validation Loop
-
-After generation, a separate validation pass compares every generated file against the paper:
-- **Equation fidelity:** Every paper equation has a code counterpart
-- **Dimension consistency:** Tensor shapes match the paper
-- **Hyperparameter completeness:** All values are configurable, not hardcoded
-- **Loss function accuracy:** Matches the paper's formulation
-
-Critical issues are auto-fixed up to N iterations (default: 2).
-
----
-
-## Supported Models
-
-| Provider | Models | Context | Vision | Cost |
-|----------|--------|---------|--------|------|
-| **Gemini** | 2.5 Pro, 2.0 Flash, 1.5 Pro | 1M-2M | Yes | $0.0001-$0.01/1K |
-| **OpenAI** | GPT-4o, GPT-4-turbo, o3, o1 | 128K-200K | Yes | $0.0025-$0.06/1K |
-| **Anthropic** | Claude Sonnet 4, Opus 4, 3.5 Sonnet | 200K | Yes | $0.003-$0.075/1K |
-| **Ollama** | DeepSeek, Llama 3.1, CodeLlama, Mistral, LLaVA | 4K-128K | Partial | Free |
-
----
-
-## CLI Reference
-
-```
-python main.py [OPTIONS]
-
-Required (one of):
-  --pdf_url URL                URL of the research paper PDF
-  --pdf_path PATH              Path to a local PDF file
-
-Mode:
-  --mode MODE                  classic (default) | agent
-
-Provider:
-  --provider NAME              gemini | openai | anthropic | ollama
-  --model NAME                 Specific model name
-  --vision-provider NAME       Separate provider for vision tasks
-  --vision-model NAME          Specific vision model
-
-Classic Pipeline Options:
-  --output_dir DIR             Output directory (default: ./generated_repo)
-  --skip-validation            Skip validation pass
-  --skip-tests                 Skip test generation
-  --skip-equations             Skip equation extraction
-  --max-fix-iterations N       Max auto-fix attempts (default: 2)
-
-Agent Pipeline Options (--mode agent):
-  --refine                     Enable self-refine loops at each stage
-  --execute                    Enable execution sandbox + auto-debug
-  --evaluate                   Enable reference-based evaluation
-  --no-tests                   Disable test generation
-  --no-devops                  Disable DevOps file generation
-  --interactive                Pause after planning for user review
-  --reference-dir DIR          Reference implementation for evaluation
-  --max-refine-iterations N    Max self-refine iterations (default: 2)
-  --max-debug-iterations N     Max auto-debug iterations (default: 3)
-
-Advanced Features (v3.1):
-  --code-rag                   Enable CodeRAG: mine GitHub for reference implementations
-  --no-segmentation            Disable automatic document segmentation
-  --no-context-manager         Disable context manager (use legacy rolling-window)
-
-Cache:
-  --no-cache                   Disable caching
-  --cache-dir DIR              Custom cache directory
-  --clear-cache                Clear all cached data
-
-Misc:
-  --list-providers             Show available providers and models
-  --verbose, -v                Verbose output
-```
-
----
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|------------|----------|
-| `GEMINI_API_KEY` | Google Gemini API key | For Gemini provider |
-| `OPENAI_API_KEY` | OpenAI API key | For OpenAI provider |
-| `ANTHROPIC_API_KEY` | Anthropic API key | For Anthropic provider |
-| `OLLAMA_HOST` | Ollama server URL (default: `http://localhost:11434`) | For Ollama |
-| `R2R_PROVIDER` | Default provider override | No |
-| `R2R_MODEL` | Default model override | No |
-| `R2R_CACHE_DIR` | Custom cache directory | No |
-
----
-
-## Performance & Efficiency
-
-### Parallel Execution
-
-File generation and analysis run in parallel when files have no inter-dependencies:
-
-- **Code generation**: Files are grouped by dependency depth via topological sort. Files at the same depth level are generated concurrently (up to 4 threads).
-- **File analysis**: Processed in batches of 4 using `ThreadPoolExecutor`. Each batch shares a frozen snapshot of prior analyses.
-- **Pipeline stages**: Stages 3b (segmentation) and 3c (CodeRAG) run in background threads alongside stage 3 (file analysis).
-
-### Caching
-
-Both classic and agent mode support `PipelineCache`:
-- Content-addressed via SHA-256 hash of the source PDF
-- Caches analysis, architecture plans, generated files, and validation reports
-- Disable with `--no-cache`, clear with `--clear-cache`
-
-### Retry & Resilience
-
-All provider calls use automatic retry with exponential backoff:
-- Retries on `ConnectionError`, `TimeoutError`, `OSError`
-- Detects rate limits (HTTP 429 / quota errors) and waits before retrying
-- Default: 2 retries, backoff factor 1.0 (waits 1s, 2s, 4s, ...)
-
-### Adaptive Token Limits
-
-Token budgets are assigned per file type via `R2RConfig.max_tokens_for_file()`:
-
-| File Type | Token Limit |
-|-----------|-------------|
-| Model / Network / Encoder / Decoder | 12,288 |
-| Training / Trainer | 10,240 |
-| Test files | 6,144 |
-| Config / Utils / `__init__` | 4,096 |
-| YAML / TOML / Markdown / Text | 2,048 |
-| Default (other `.py`) | 8,192 |
-
-### Timeout Configuration
-
-Configurable via `R2RConfig` (defaults shown):
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `llm_generation_timeout` | 600s | Max time for a single LLM generation call |
-| `validation_timeout` | 300s | Max time for code validation |
-| `execution_timeout` | 900s | Max time for sandbox execution |
-
----
-
-## Comparison with PaperCoder & DeepCode
-
-| Feature | Research2Repo v3.1 | PaperCoder | DeepCode |
-|---------|-------------------|------------|----------|
-| Multi-model support | Gemini, OpenAI, Anthropic, Ollama | GPT-4o only | Claude, GPT, Gemini |
-| Decomposed planning | 4-stage (overall/arch/logic/config) | 3-stage (overall/arch/logic) | Requirement analysis |
-| Per-file analysis | Yes | Yes | Memory agent context |
-| Self-refine loops | All stages | Plan + code | No |
-| UML diagrams | Mermaid class + sequence | PlantUML class + sequence | No |
-| Vision/diagram extraction | Yes (multimodal) | No | No |
-| Equation extraction | Dedicated pipeline | No | No |
-| Execution sandbox | Docker + local | No | Execute + debug |
-| Auto-debug | Yes (19+ error types) | No | Yes |
-| DevOps generation | Dockerfile, CI, Makefile | No | No |
-| Reference evaluation | LLM-based scoring | No | No |
-| Caching | Content-addressed | No | No |
-| Local models | Ollama support | No | No |
-| CodeRAG (ref mining) | GitHub search + LLM indexing | No | Codebase indexing |
-| Document segmentation | 4 strategies, algorithm-preserving | No | 5 strategies |
-| Context management | Clean-slate + cumulative summaries | Rolling window | Concise memory agent |
-| Parallel execution | Dependency-depth threading (4 workers) | No | No |
-| Retry with backoff | Exponential backoff, rate-limit aware | No | No |
-| Adaptive token limits | Per-file-type budgets (2K-12K) | Fixed | Fixed |
-
----
-
-## Deployment Modes
-
-Research2Repo supports two deployment modes. It works as a **standalone CLI tool** or as a **managed engine** behind the [Any2Repo-Gateway](https://github.com/nellaivijay/Any2Repo-Gateway).
-
-### Mode 1: Standalone CLI (default)
-
-The standard way to use Research2Repo — run it directly from the command line:
-
+Run the test suite:
 ```bash
-# Classic pipeline
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
-
-# Agent pipeline with all features
-python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf" \
-  --mode agent --refine --execute --code-rag
-
-# Local PDF
-python main.py --pdf_path ./papers/attention.pdf --output_dir ./my_repo
-```
-
-No gateway, no infrastructure — just Python and an LLM API key.
-
-### Mode 2: Gateway-Managed Engine
-
-When deployed behind [Any2Repo-Gateway](https://github.com/nellaivijay/Any2Repo-Gateway), the engine is launched with a `JOB_ID` environment variable. It automatically switches to gateway mode:
-
-```bash
-# The gateway sets these env vars when launching the engine:
-JOB_ID=abc123 TENANT_ID=acme PDF_URL="https://arxiv.org/pdf/1706.03762.pdf" \
-  OUTPUT_DIR=/output ENGINE_OPTIONS='{"mode":"agent","refine":true}' \
-  python main.py
-```
-
-In gateway mode, the engine:
-1. Reads all parameters from environment variables (no CLI args needed)
-2. Runs the pipeline (classic or agent, based on `ENGINE_OPTIONS`)
-3. Writes `.any2repo_status.json` to the output directory
-4. Optionally POSTs results to `CALLBACK_URL`
-5. Exits with code 0 (success) or 1 (failure)
-
-**Gateway environment variables:**
-
-| Variable | Required | Description |
-|---|---|---|
-| `JOB_ID` | Yes | Unique job identifier (triggers gateway mode) |
-| `TENANT_ID` | No | Tenant who submitted the job |
-| `PDF_URL` | One of | URL of the research paper |
-| `PDF_BASE64` | these | Base64-encoded PDF |
-| `PAPER_TEXT` | three | Raw paper text |
-| `OUTPUT_DIR` | No | Output directory (default: `/tmp/r2r-{JOB_ID}`) |
-| `ENGINE_OPTIONS` | No | JSON string: `{"mode":"agent","refine":true,...}` |
-| `CALLBACK_URL` | No | URL to POST results on completion |
-| `R2R_PROVIDER` | No | Override LLM provider |
-| `R2R_MODEL` | No | Override model name |
-
-**Supported backends:** GCP Vertex AI, AWS Bedrock, Azure ML, On-Premise (Docker/K8s)
-
-### Any2Repo Engine Protocol
-
-Research2Repo implements the [Any2Repo Engine Protocol v1.0](https://github.com/nellaivijay/Any2Repo-Gateway/blob/main/docs/engine_protocol.md).
-
-**Engine Manifest:**
-
-```json
-{
-  "engine_id": "research2repo",
-  "version": "2.0.0",
-  "display_name": "Research2Repo",
-  "description": "Convert ML/AI research papers into fully functional repositories",
-  "protocol_version": "1.0",
-  "capabilities": ["pdf_input", "text_input", "github_output", "local_output", "streaming_logs", "incremental_validation"],
-  "accepted_inputs": ["pdf_url", "pdf_base64", "paper_text"],
-  "container_image": "any2repo/research2repo:latest",
-  "supported_backends": ["gcp_vertex", "aws_bedrock", "azure_ml", "on_prem"],
-  "cpu_request": "4",
-  "memory_request": "16Gi",
-  "timeout_seconds": 3600
-}
+pytest tests/
 ```
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0 License - See LICENSE file for details.
+
+## Educational Use
+
+This tool is provided for educational purposes to help students and researchers learn about:
+- Agentic AI architectures and multi-agent systems
+- Multi-model LLM integration and provider abstraction
+- Automated code generation and validation techniques
+- Research-to-implementation workflows
+- Self-refine loops and automated debugging
+- Software automation and DevOps generation
