@@ -1,0 +1,28 @@
+{
+  "title": "ResNet: Deep Residual Learning for Image Recognition",
+  "authors": ["He et al."],
+  "abstract": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions.",
+  "sections": [
+    "Introduction",
+    "Related Work",
+    "Deep Residual Learning",
+    "Experiments",
+    "Analysis",
+    "Conclusion"
+  ],
+  "equations": [
+    "y = F(x, {W_i}) + x",
+    "F(x) = max(0, x)",
+    "loss = MSE(y_pred, y_true)",
+    "IoU = Area_of_Overlap / Area_of_Union"
+  ],
+  "hyperparameters": {
+    "input_size": 224,
+    "num_layers": 50,
+    "learning_rate": 0.01,
+    "momentum": 0.9,
+    "weight_decay": 0.0001
+  },
+  "domain": "cv",
+  "complexity": "medium"
+}

@@ -1,0 +1,30 @@
+{
+  "title": "Attention Is All You Need",
+  "authors": ["Vaswani et al."],
+  "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+  "sections": [
+    "Introduction",
+    "Background",
+    "Model Architecture",
+    "Why Self-Attention",
+    "Training",
+    "Results",
+    "Conclusion"
+  ],
+  "equations": [
+    "Attention(Q,K,V) = softmax(QK^T / sqrt(d_k))V",
+    "FFN(x) = max(0, xW_1 + b_1)W_2 + b_2",
+    "PE(pos, 2i) = sin(pos / 10000^(2i/d_model))",
+    "PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))"
+  ],
+  "hyperparameters": {
+    "d_model": 512,
+    "d_ff": 2048,
+    "heads": 8,
+    "layers": 6,
+    "dropout": 0.1,
+    "learning_rate": 0.0001
+  },
+  "domain": "ml",
+  "complexity": "medium"
+}

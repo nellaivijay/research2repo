@@ -1,0 +1,198 @@
+# Pipeline Configurations for Research2Repo
+# This file contains configuration for different pipeline modes
+
+classic:
+  # Classic mode pipeline configuration
+  stages:
+    - name: download_pdf
+      timeout: 120
+      retry_attempts: 3
+    - name: analyze_paper
+      timeout: 300
+      retry_attempts: 2
+    - name: extract_equations
+      timeout: 180
+      retry_attempts: 2
+      enabled: true
+    - name: design_architecture
+      timeout: 240
+      retry_attempts: 2
+    - name: generate_config
+      timeout: 60
+      retry_attempts: 1
+    - name: synthesize_code
+      timeout: 600
+      retry_attempts: 2
+    - name: generate_tests
+      timeout: 180
+      retry_attempts: 2
+      enabled: true
+    - name: validate_code
+      timeout: 240
+      retry_attempts: 2
+    - name: auto_fix_issues
+      timeout: 300
+      retry_attempts: 2
+      max_iterations: 2
+    - name: save_repository
+      timeout: 60
+      retry_attempts: 1
+  
+  # Default provider settings
+  default_provider: gemini
+  default_model: gemini-1.5-pro
+  fallback_providers:
+    - openai
+    - anthropic
+  
+  # Feature flags
+  enable_cache: true
+  enable_vision: true
+  enable_equation_extraction: true
+  enable_test_generation: true
+  enable_validation: true
+  enable_auto_fix: true
+  
+  # Performance settings
+  max_fix_iterations: 2
+  max_refine_iterations: 0  # Classic mode doesn't use refine
+  max_debug_iterations: 0  # Classic mode doesn't use debugging
+  
+  # Output settings
+  output_format: "repository"
+  include_readme: true
+  include_license: true
+  include_setup_py: true
+
+agent:
+  # Agent mode pipeline configuration
+  stages:
+    - name: parse_paper
+      timeout: 120
+      retry_attempts: 3
+    - name: decomposed_planning
+      timeout: 300
+      retry_attempts: 2
+      sub_stages:
+        - overall_plan
+        - architecture_design
+        - logic_design
+        - config_generation
+    - name: per_file_analysis
+      timeout: 400
+      retry_attempts: 2
+    - name: document_segmentation
+      timeout: 120
+      retry_attempts: 2
+      enabled: true
+      max_segments: 10
+    - name: self_refine_loop
+      timeout: 300
+      retry_attempts: 2
+      enabled: true
+      max_iterations: 2
+    - name: code_rag_mining
+      timeout: 240
+      retry_attempts: 2
+      enabled: false
+      max_references: 5
+    - name: context_managed_coding
+      timeout: 600
+      retry_attempts: 2
+    - name: validation
+      timeout: 240
+      retry_attempts: 2
+    - name: execution_sandbox
+      timeout: 300
+      retry_attempts: 2
+      enabled: false
+    - name: auto_debugging
+      timeout: 300
+      retry_attempts: 2
+      enabled: false
+      max_iterations: 3
+    - name: devops_generation
+      timeout: 180
+      retry_attempts: 2
+      enabled: true
+    - name: reference_evaluation
+      timeout: 240
+      retry_attempts: 2
+      enabled: false
+  
+  # Default provider settings
+  default_provider: gemini
+  default_model: gemini-1.5-pro
+  fallback_providers:
+    - openai
+    - anthropic
+  
+  # Feature flags
+  enable_cache: true
+  enable_vision: true
+  enable_refine: true
+  enable_execution: false
+  enable_tests: true
+  enable_devops: true
+  enable_code_rag: false
+  enable_segmentation: true
+  enable_evaluation: false
+  
+  # Performance settings
+  max_fix_iterations: 2
+  max_refine_iterations: 2
+  max_debug_iterations: 3
+  
+  # Context management
+  context_window: 100000
+  context_summary_interval: 5
+  
+  # Output settings
+  output_format: "repository"
+  include_readme: true
+  include_license: true
+  include_setup_py: true
+  include_dockerfile: true
+  include_ci_config: true
+
+minimal:
+  # Minimal pipeline configuration for quick testing
+  stages:
+    - name: download_pdf
+      timeout: 60
+      retry_attempts: 1
+    - name: analyze_paper
+      timeout: 120
+      retry_attempts: 1
+    - name: design_architecture
+      timeout: 120
+      retry_attempts: 1
+    - name: synthesize_code
+      timeout: 300
+      retry_attempts: 1
+    - name: save_repository
+      timeout: 30
+      retry_attempts: 1
+  
+  # Default provider settings
+  default_provider: gemini
+  default_model: gemini-1.5-flash  # Faster model for minimal mode
+  
+  # Feature flags - minimal features only
+  enable_cache: true
+  enable_vision: false
+  enable_equation_extraction: false
+  enable_test_generation: false
+  enable_validation: false
+  enable_auto_fix: false
+  
+  # Performance settings
+  max_fix_iterations: 0
+  max_refine_iterations: 0
+  max_debug_iterations: 0
+  
+  # Output settings
+  output_format: "repository"
+  include_readme: true
+  include_license: false
+  include_setup_py: false
