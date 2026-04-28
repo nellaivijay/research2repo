@@ -1,78 +1,163 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "research2repo"
-version = "3.0.0"
-description = "Multi-model agentic framework to convert ML research papers into GitHub repositories (PaperCoder-inspired)"
-readme = "README.md"
-license = {text = "Apache-2.0"}
-requires-python = ">=3.10"
 authors = [
-    {name = "Vijay Anand"},
+    {name = "Research2Repo Contributors", email = "research2repo@example.com"}
 ]
-keywords = ["machine-learning", "code-generation", "research", "llm", "agentic", "papercoder"]
+description = "Convert research papers to reproducible code repositories"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-
-dependencies = [
-    "requests>=2.31.0",
-    "PyPDF2>=3.0.0",
-    "Pillow>=10.2.0",
-    "pyyaml>=6.0",
-]
-
-[project.optional-dependencies]
-gemini = [
-    "google-generativeai>=0.5.0",
-]
-openai = [
-    "openai>=1.12.0",
-]
-anthropic = [
-    "anthropic>=0.25.0",
-]
-vision = [
-    "PyMuPDF>=1.24.0",
-]
-parsing = [
-    "PyMuPDF>=1.24.0",
-    "lxml>=5.0.0",
-]
-all = [
-    "google-generativeai>=0.5.0",
-    "openai>=1.12.0",
-    "anthropic>=0.25.0",
-    "PyMuPDF>=1.24.0",
-    "lxml>=5.0.0",
-]
-dev = [
-    "pytest>=8.0",
-    "pytest-cov>=4.0",
-    "ruff>=0.3.0",
-]
-
-[project.scripts]
-research2repo = "main:main"
+keywords = ["AI", "research", "papers", "code-generation", "LLM", "reproducibility"]
+dynamic = ["version", "dependencies"]
 
 [project.urls]
-Homepage = "https://github.com/nellaivijay/Research2Repo"
-Repository = "https://github.com/nellaivijay/Research2Repo"
-Issues = "https://github.com/nellaivijay/Research2Repo/issues"
+Github = "https://github.com/your-org/Research2Repo"
+Documentation = "https://github.com/your-org/Research2Repo/wiki"
+"Bug Reports" = "https://github.com/your-org/Research2Repo/issues"
+
+[project.scripts]
+research2repo = "research2repo.cli:main"
+r2r = "research2repo.cli:main"
+
+[project.optional-dependencies]
+# LLM providers
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.18.0"]
+gemini = ["google-generativeai>=0.3.0"]
+
+# Web interface
+web = ["gradio>=4.0.0", "plotly>=5.0.0"]
+
+# Testing
+test = ["pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-asyncio>=0.21.0"]
+
+# Development
+dev = ["pre-commit", "ruff", "black", "isort", "mypy", "build"]
+
+# Documentation
+docs = ["sphinx>=7.0.0", "sphinx-rtd-theme>=1.3.0"]
+
+# All dependencies
+all = [
+    "research2repo[openai,anthropic,gemini,web,test,dev,docs]"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["test_code*", "datasets*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "research2repo.version.__version__"}
+dependencies = {file = "requirements.txt"}
 
 [tool.ruff]
-line-length = 100
 target-version = "py310"
+line-length = 119
+indent-width = 4
+
+[tool.ruff.lint]
+ignore = ["C408", "C901", "E501", "E731", "E741", "W605"]
+select = ["C", "E", "F", "I", "W"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+known-first-party = ["research2repo"]
+known-third-party = [
+    "accelerate",
+    "anthropic",
+    "datasets",
+    "gradio",
+    "numpy",
+    "openai",
+    "torch",
+    "transformers",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.black]
+line-length = 119
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 119
+known_first_party = ["research2repo"]
+known_third_party = [
+    "accelerate",
+    "anthropic",
+    "datasets",
+    "gradio",
+    "numpy",
+    "openai",
+    "torch",
+    "transformers",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=architecture --cov=web --cov=test_code --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["architecture", "web", "test_code"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

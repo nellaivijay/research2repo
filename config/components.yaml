@@ -1,0 +1,119 @@
+# Research2Repo Component Configuration
+# Centralized configuration for all algorithms and components
+
+# LLM Providers
+providers:
+  openai:
+    name: openai
+    params:
+      api_key: null  # Set via environment variable OPENAI_API_KEY
+      model: gpt-4
+      temperature: 0.7
+      max_tokens: 2000
+      timeout: 120
+  
+  anthropic:
+    name: anthropic
+    params:
+      api_key: null  # Set via environment variable ANTHROPIC_API_KEY
+      model: claude-3-opus-20240229
+      temperature: 0.7
+      max_tokens: 2000
+      timeout: 120
+  
+  gemini:
+    name: gemini
+    params:
+      api_key: null  # Set via environment variable GEMINI_API_KEY
+      model: gemini-pro
+      temperature: 0.7
+      max_tokens: 2000
+      timeout: 120
+  
+  ollama:
+    name: ollama
+    params:
+      host: http://127.0.0.1:11434
+      model: llama2
+      temperature: 0.7
+      timeout: 120
+
+# Paper Processors
+processors:
+  grobid:
+    name: grobid
+    params:
+      url: http://127.0.0.1:8070/api/processFulltextDocument
+      timeout: 60
+      cache_dir: ./cache/grobid
+  
+  pdfminer:
+    name: pdfminer
+    params:
+      cache_dir: ./cache/pdfminer
+  
+  pymupdf:
+    name: pymupdf
+    params:
+      cache_dir: ./cache/pymupdf
+
+# Code Generators
+generators:
+  simple:
+    name: simple
+    params:
+      max_iterations: 3
+      temperature: 0.7
+  
+  iterative:
+    name: iterative
+    params:
+      max_iterations: 5
+      temperature: 0.7
+      refinement_steps: 2
+  
+  multi_agent:
+    name: multi_agent
+    params:
+      max_iterations: 5
+      temperature: 0.7
+      num_agents: 3
+
+# Evaluation Metrics
+evaluators:
+  syntax:
+    name: syntax
+    params:
+      check_imports: true
+      check_execution: true
+  
+  semantic:
+    name: semantic
+    params:
+      similarity_threshold: 0.8
+  
+  reproducibility:
+    name: reproducibility
+    params:
+      check_dependencies: true
+      check_data_availability: true
+
+# Data Selectors (for future use)
+selectors:
+  random:
+    name: random
+    params:
+      seed: 42
+      replacement: false
+  
+  importance:
+    name: importance
+    params:
+      strategy: gradient
+      cache_dir: ./cache/importance
+  
+  diversity:
+    name: diversity
+    params:
+      strategy: clustering
+      n_clusters: 5
