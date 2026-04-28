@@ -1,6 +1,9 @@
 """
-Providers package - Multi-model provider abstraction
+Multi-model provider abstraction layer.
+Supports: Google Gemini, OpenAI GPT-4, Anthropic Claude, Ollama (local).
 """
 
-# This will be populated when existing providers/ directory is moved
-# For now, this is a placeholder for the restructuring plan
+from .registry import ProviderRegistry, get_provider
+from .base import BaseProvider, ModelCapability
+
+__all__ = ["ProviderRegistry", "get_provider", "BaseProvider", "ModelCapability"]

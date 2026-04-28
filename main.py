@@ -27,8 +27,9 @@ from typing import Optional
 
 import requests
 
-from providers import ProviderRegistry, get_provider
-from providers.base import ModelCapability, GenerationConfig
+# New architecture imports
+from architecture.providers import ProviderRegistry, get_provider
+from architecture.providers.base import ModelCapability, GenerationConfig
 
 
 # ── PDF Download ──────────────────────────────────────────────────────────
@@ -109,10 +110,10 @@ def run_classic(
 
     This is the original v2.0 pipeline, kept for backward compatibility.
     """
-    from core.analyzer import PaperAnalyzer
-    from core.architect import SystemArchitect
-    from core.coder import CodeSynthesizer
-    from core.validator import CodeValidator
+    from architecture.pipeline.analyzer import PaperAnalyzer
+    from architecture.pipeline.architect import SystemArchitect
+    from architecture.pipeline.coder import CodeSynthesizer
+    from architecture.pipeline.validator import CodeValidator
     from advanced.equation_extractor import EquationExtractor
     from advanced.config_generator import ConfigGenerator
     from advanced.test_generator import TestGenerator
@@ -420,7 +421,7 @@ def run_agent(
       - Document segmentation for large papers (v3.1)
       - Context manager with cumulative code summaries (v3.1)
     """
-    from agents.orchestrator import AgentOrchestrator
+    from architecture.agents.orchestrator import AgentOrchestrator
 
     # Initialize provider
     primary_provider = get_provider(

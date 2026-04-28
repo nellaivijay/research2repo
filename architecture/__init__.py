@@ -3,16 +3,41 @@ Architecture package for Research2Repo
 Contains core system architecture components
 """
 
-from .agents import AgentOrchestrator
-from .pipeline import PaperAnalyzer, SystemArchitect, CodeSynthesizer, CodeValidator
-from .providers import ProviderRegistry, get_provider
+# Agents
+from .agents import BaseAgent, AgentState, AgentOrchestrator
+
+# Pipeline stages
+from .pipeline import (
+    PaperAnalyzer,
+    SystemArchitect, 
+    CodeSynthesizer,
+    CodeValidator,
+    DecomposedPlanner,
+    FileAnalyzer,
+    SelfRefiner,
+    PaperParser
+)
+
+# Providers
+from .providers import ProviderRegistry, get_provider, BaseProvider, ModelCapability
 
 __all__ = [
+    # Agents
+    'BaseAgent',
+    'AgentState',
     'AgentOrchestrator',
+    # Pipeline stages
     'PaperAnalyzer', 
     'SystemArchitect',
     'CodeSynthesizer',
     'CodeValidator',
+    'DecomposedPlanner',
+    'FileAnalyzer',
+    'SelfRefiner',
+    'PaperParser',
+    # Providers
     'ProviderRegistry',
-    'get_provider'
+    'get_provider',
+    'BaseProvider',
+    'ModelCapability'
 ]

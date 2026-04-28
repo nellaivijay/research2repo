@@ -2,5 +2,7 @@
 Agents package - Multi-agent architecture components
 """
 
-# This will be populated when existing agents/ directory is moved
-# For now, this is a placeholder for the restructuring plan
+from .base import BaseAgent, AgentState
+from .orchestrator import AgentOrchestrator
+
+__all__ = ['BaseAgent', 'AgentState', 'AgentOrchestrator']
