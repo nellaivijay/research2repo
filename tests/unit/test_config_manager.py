@@ -140,10 +140,11 @@ class TestConfigManager:
         manager = ConfigManager()
         
         # Set environment variable
-        os.environ["GEMINI_API_KEY"] = "test_key"
+        test_api_key = "test_gemini_key_12345"
+        os.environ["GEMINI_API_KEY"] = test_api_key
         api_key = manager.get_api_key("gemini")
         
-        assert api_key == "test_key"
+        assert api_key == test_api_key
         
         # Cleanup
         del os.environ["GEMINI_API_KEY"]

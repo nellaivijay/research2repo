@@ -17,6 +17,8 @@ from providers.base import (
     ModelInfo,
 )
 
+from config.constants import DEFAULT_OLLAMA_HOST, MODEL_CACHE_TTL_SECONDS
+
 
 class OllamaProvider(BaseProvider):
     """Ollama local model provider. Requires Ollama running at the configured host."""
@@ -94,7 +96,7 @@ class OllamaProvider(BaseProvider):
         host: Optional[str] = None,
     ):
         super().__init__(api_key=api_key, model_name=model_name)
-        self.host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        self.host = host or os.environ.get("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
         self._session = requests.Session()
         self._models_cache = None
         self._models_cache_time = 0.0
@@ -103,9 +105,9 @@ class OllamaProvider(BaseProvider):
         return "deepseek-coder-v2:latest"
 
     def available_models(self) -> list[ModelInfo]:
-        # Return cached result if within TTL (60 seconds)
+        # Return cached result if within TTL
         now = time.monotonic()
-        if self._models_cache is not None and (now - self._models_cache_time) < 60:
+        if self._models_cache is not None and (now - self._models_cache_time) < MODEL_CACHE_TTL_SECONDS:
             return self._models_cache
 
         # Merge known models with what's actually available locally

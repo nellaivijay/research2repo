@@ -1,0 +1,166 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Python CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '**'
+      - '!.github/workflows/**'
+      - '!.github/workflows/python-ci.yml'
+      - '!.github/ISSUE_TEMPLATE/**'
+      - '!.gitignore'
+      - '!.asf.yml'
+      - '!mkdocs/**'
+      - '!.gitattributes'
+      - '!README.md'
+      - '!CONTRIBUTING.md'
+      - '!LICENSE'
+      - '!NOTICE'
+
+permissions:
+  contents: read
+  concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint-and-unit-test:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      fail-fast: true
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
+        with:
+          enable-cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pytest pytest-cov
+
+      - name: Run linters
+        run: |
+          uv run pytest tests/unit/ -v
+
+      - name: Run unit tests with coverage
+        run: |
+          uv run pytest tests/unit/ --cov=architecture --cov=advanced --cov=config --cov=tests -v --cov-report=term-missing
+
+      - name: Coverage threshold check (80%)
+        run: |
+          uv run pytest tests/unit/ --cov=architecture --cov=advanced --cov=config --cov=tests -v --cov-fail-under=80
+
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pytest pytest-cov
+
+      - name: Run integration tests
+        run: |
+          uv run pytest tests/integration/ -v
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: coverage-integration
+          path: .coverage*
+          include-hidden-files: true
+
+  coverage-report:
+    runs-on: ubuntu-latest
+    needs: [lint-and-unit-test, integration-test]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098 # v7.3.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pytest pytest-cov
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Generate coverage report (75%)
+        run: |
+          uv run pytest tests/ --cov=architecture --cov=advanced --cov=config --cov=tests -v --cov-report=xml --cov-report=html --cov-fail-under=75
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+          include-hidden-files: true

@@ -157,8 +157,10 @@ class PaperParser:
         """
         import requests  # type: ignore[import-untyped]
 
+        from config.constants import DEFAULT_GROBID_URL, MAX_ABSTRACT_LENGTH
+
         grobid_url = os.environ.get(
-            "GROBID_URL", "http://localhost:8070/api/processFulltextDocument"
+            "GROBID_URL", DEFAULT_GROBID_URL
         )
 
         try:
@@ -373,7 +375,7 @@ class PaperParser:
             re.DOTALL,
         )
         if abstract_match:
-            abstract = abstract_match.group(1).strip()[:3000]
+            abstract = abstract_match.group(1).strip()[:MAX_ABSTRACT_LENGTH]
 
         page_count = len(doc)
         doc.close()
@@ -432,7 +434,7 @@ class PaperParser:
             re.DOTALL,
         )
         if abstract_match:
-            abstract = abstract_match.group(1).strip()[:3000]
+            abstract = abstract_match.group(1).strip()[:MAX_ABSTRACT_LENGTH]
 
         return ParsedPaper(
             title=title,

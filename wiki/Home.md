@@ -46,6 +46,16 @@ Research2Repo automates the conversion of ML research papers (PDFs) into fully f
 6. **Executes** generated code in a sandbox and auto-debugs failures
 7. **Produces** DevOps artifacts (Dockerfile, CI, Makefile)
 
+### New Features (v3.1)
+
+- **Gradio Web Interface**: Interactive web demo for paper analysis and pipeline execution
+- **Advanced CLI Tools**: Batch processing, cost estimation, and result export
+- **Visualization Utilities**: Pipeline flow diagrams, progress charts, cost breakdown
+- **Configuration Management**: YAML-based pipeline and provider configurations
+- **Synthetic Data Generation**: Generate test papers and code without real data
+- **Comprehensive Testing**: Mock providers, integration tests, and pytest setup
+- **Modular Architecture**: Professional repository structure following industry best practices
+
 ### Dual Pipeline Modes
 
 | Mode | Description | Best For |
@@ -85,6 +95,12 @@ pip install -r requirements.txt
 
 # Set up a provider
 export GEMINI_API_KEY="your_key_here"
+
+# Interactive web interface
+python web/app.py
+
+# Advanced CLI with batch processing
+python test_code/inference.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"
 
 # Run (classic mode)
 python main.py --pdf_url "https://arxiv.org/pdf/1706.03762.pdf"

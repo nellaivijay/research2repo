@@ -82,7 +82,9 @@ class ProviderRegistry:
                 # Ollama: check if the service is reachable
                 try:
                     import requests
-                    resp = requests.get("http://localhost:11434/api/tags", timeout=2)
+                    from config.constants import DEFAULT_OLLAMA_HOST
+                    ollama_host = os.environ.get("OLLAMA_HOST", DEFAULT_OLLAMA_HOST)
+                    resp = requests.get(f"{ollama_host}/api/tags", timeout=2)
                     if resp.status_code == 200:
                         available.append(name)
                 except Exception:
