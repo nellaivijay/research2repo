@@ -1,5 +1,11 @@
 # Research2Repo
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-passing-brightgreen.svg)](https://github.com/nellaivijay/Research2Repo/actions)
+[![Documentation](https://img.shields.io/badge/docs-wiki-blue.svg)](https://github.com/nellaivijay/Research2Repo/wiki)
+[![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 **Educational agentic framework for converting research papers into implementation repositories**
 
 Research2Repo is an open source educational tool designed to help students and researchers understand how to convert academic research papers into production-ready code repositories. It demonstrates advanced concepts in agentic AI systems, multi-model integration, and automated software development.
@@ -85,6 +91,18 @@ ollama pull deepseek-coder-v2
 
 ### Basic Usage
 
+#### Interactive Web Interface
+```bash
+# Launch the Gradio web interface
+python web/app.py
+```
+Access the interactive demo at the local URL provided. Features include:
+- Paper upload and analysis
+- Pipeline visualization and progress tracking
+- Provider comparison and cost estimation
+- Interactive configuration and result preview
+
+#### Command Line Interface
 ```bash
 # Classic mode with auto-detected provider
 python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf"
@@ -100,6 +118,21 @@ python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent --execut
 
 # Full pipeline with all features
 python main.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --mode agent --refine --execute
+```
+
+#### Advanced CLI Inference
+```bash
+# Batch processing multiple papers
+python test_code/inference.py --batch_file papers.txt --output_dir ./outputs
+
+# Cost estimation only
+python test_code/inference.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --estimate_cost only
+
+# List available providers
+python test_code/inference.py --list_providers
+
+# Resume interrupted pipeline
+python test_code/inference.py --pdf_url "https://arxiv.org/pdf/paper.pdf" --resume
 ```
 
 ## Architecture
@@ -208,3 +241,20 @@ This tool is provided for educational purposes to help students and researchers 
 - Research-to-implementation workflows
 - Self-refine loops and automated debugging
 - Software automation and DevOps generation
+
+## 📅 Recent Updates
+
+- [x] Added Gradio web interface for interactive paper analysis and pipeline execution
+- [x] Added advanced CLI inference script for batch processing and cost estimation
+- [x] Added visualization utilities for pipeline stages and results
+- [x] Enhanced README with professional badges and documentation
+- [x] Added comprehensive OmniShotCut-based analysis and improvement plan
+- [ ] Implement repository restructuring (see RESTRUCTURE_PLAN.md)
+- [ ] Add HuggingFace Space for easy deployment
+- [ ] Enhance testing infrastructure with integration tests
+- [ ] Add synthetic data generation for pipeline testing
+- [ ] Implement configuration management system
+
+---
+
+**Note**: This framework is continuously updated with new features, providers, and improvements. Star the repository to stay updated with the latest additions!
